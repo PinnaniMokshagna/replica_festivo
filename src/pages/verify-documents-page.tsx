@@ -95,22 +95,23 @@ export function VerifyDocumentsPage() {
     try {
       let finalIdNumber = govtIdNumber.trim();
       if (!finalIdNumber) {
-        finalIdNumber = '5482 9912 3014';
-        setGovtIdNumber(finalIdNumber);
+        setSubmitError('Please enter your Government ID / Aadhaar / PAN number.');
+        setIsSubmitting(false);
+        return;
       }
 
       let finalGovtIdFile = govtIdFile;
       if (!finalGovtIdFile) {
-        finalGovtIdFile = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800';
-        setGovtIdFile(finalGovtIdFile);
-        setGovtIdFileName('Aadhaar_Govt_Photo_ID.png');
+        setSubmitError('Please upload your Government Photo ID document (Aadhaar / PAN / Passport).');
+        setIsSubmitting(false);
+        return;
       }
 
       let finalBankProofFile = bankProofFile;
       if (!finalBankProofFile) {
-        finalBankProofFile = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800';
-        setBankProofFile(finalBankProofFile);
-        setBankProofFileName('Cancelled_Cheque_Proof.png');
+        setSubmitError('Please upload your Banking Proof document (Cancelled Cheque / Bank Passbook).');
+        setIsSubmitting(false);
+        return;
       }
 
       const activeProfile = (() => {

@@ -96,7 +96,7 @@ export default function AdminDashboard() {
             status: isApproved ? 'Approved' : (hasDocs ? 'Pending Verification' : (app.details?.status || 'Pending Verification')),
             kyc: {
               ...app.details?.kyc,
-              idNumber: rawId || (hasDocs ? '123456789123' : 'Not submitted'),
+              idNumber: rawId || 'Not submitted',
               aadhaarFront: frontImg,
               cancelledCheque: chequeImg,
               businessRegFile: kRec?.businessRegFile || app.details?.kyc?.businessRegFile || undefined,
