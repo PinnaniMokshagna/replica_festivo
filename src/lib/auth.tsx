@@ -19,7 +19,7 @@ type AuthContextType = {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string, role?: 'vendor' | 'customer') => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name: string, role: UserRole, category?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   sendOtp: (email: string) => Promise<{ error: string | null }>;
@@ -96,9 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Supabase auth network error, fallback to demo mode:', e);
     }
-
-    const emailLower = email.trim().toLowerCase();
-
     // --- Look up registration data from festivo_pending_vendors by email ---
     let registeredVendorData: any = null;
     try {
@@ -238,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const signUp = async (email: string, password: string, name: string, role: UserRole) => {
+  const signUp = async (email: string, password: string, name: string, role: UserRole, category?: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -314,7 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: emailLower,
         fullName: finalName,
         businessName,
-        category: 'Event Provider',
+        category: category || 'Photographer',
         location: 'Hyderabad, India',
         phone: '+91 98765 43210',
         username: slug,

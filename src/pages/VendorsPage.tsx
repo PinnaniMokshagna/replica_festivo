@@ -92,7 +92,7 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
             <span className="text-dark-400 text-xs">({vendor.reviews} reviews)</span>
           </div>
           <div className="flex flex-wrap gap-1.5 mb-4">
-            {vendor.tags.slice(0, 3).map((tag) => (
+            {(vendor.tags || []).slice(0, 3).map((tag) => (
               <span key={tag} className="text-dark-600 text-xs bg-cream-50 px-2 py-1 rounded-lg border border-cream-200">{tag}</span>
             ))}
           </div>
@@ -100,8 +100,8 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
 
         <div className="flex items-center justify-between pt-4 border-t border-cream-200 mt-auto">
           <div>
-            <p className="text-dark-900 font-bold text-lg leading-none">{vendor.price_unit}{vendor.price_amount.toLocaleString('en-IN')}</p>
-            <p className="text-dark-400 text-xs mt-0.5">{vendor.price_label}</p>
+            <p className="text-dark-900 font-bold text-lg leading-none">{vendor.price_unit || '₹'}{(Number(vendor.price_amount) || 0).toLocaleString('en-IN')}</p>
+            <p className="text-dark-400 text-xs mt-0.5">{vendor.price_label || 'onwards'}</p>
           </div>
           <button
             onClick={() => navigate(`/book/${vendor.slug}`)}

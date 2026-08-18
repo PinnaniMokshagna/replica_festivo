@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, ArrowLeft, Star, MapPin, CheckCircle2, Sparkles,
@@ -26,17 +26,19 @@ export default function CategoryDetailPage() {
   const heroRef = useInView<HTMLDivElement>();
   const gridRef = useInView<HTMLDivElement>();
 
-  const cat = category ? getCategory(decodeURIComponent(category)) : undefined;
+  const categoryParam = category ? decodeURIComponent(category) : '';
+  const cat = useMemo(() => {
+    return getCategory(categoryParam) || CATEGORIES[0];
+  }, [categoryParam]);
 
   useEffect(() => {
-    if (!cat) { navigate('/explore'); return; }
-
     const isCategoryMatch = (vCategory: string, catLabel: string) => {
+      if (!vCategory || !catLabel) return false;
       const v = (vCategory || '').toLowerCase().trim();
       const c = (catLabel || '').toLowerCase().trim();
       if (v === c) return true;
       if ((c.includes('makeup') || c.includes('beauty')) && (v.includes('makeup') || v.includes('beauty'))) return true;
-      if ((c.includes('photo') || c.includes('video')) && (v.includes('photo') || v.includes('video'))) return true;
+      if ((c.includes('photo') || c.includes('video') || c.includes('camera')) && (v.includes('photo') || v.includes('video') || v.includes('camera'))) return true;
       if (c.includes('cater') && v.includes('cater')) return true;
       if (c.includes('decor') && v.includes('decor')) return true;
       if (c.includes('venue') && v.includes('venue')) return true;
@@ -69,11 +71,9 @@ export default function CategoryDetailPage() {
     );
 
     const matchingVendors = deduplicated.filter(v => isCategoryMatch(v.category, cat.label));
-    setVendors(matchingVendors.length > 0 ? matchingVendors : deduplicated);
+    setVendors(matchingVendors.length > 0 ? matchingVendors : deduplicated.filter(v => isCategoryMatch(v.category, 'Photographer')));
     setLoading(false);
-  }, [cat, navigate]);
-
-  if (!cat) return null;
+  }, [cat]);
 
   const filtered = vendors.filter(v =>
     v.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -276,14 +276,14 @@ export default function CategoryDetailPage() {
                       </div>
                       <p className="text-dark-500 text-sm leading-relaxed mb-4 line-clamp-2 font-medium">{vendor.description}</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {vendor.tags.slice(0, 3).map(tag => (
+                        {(vendor.tags || []).slice(0, 3).map(tag => (
                           <span key={tag} className="text-dark-600 text-xs bg-cream-50 px-2 py-1 rounded-lg border border-cream-200">{tag}</span>
                         ))}
                       </div>
                       <div className="flex items-center justify-between pt-4 border-t border-cream-200">
                         <div>
-                          <p className="font-display font-bold text-sage-900 text-lg">{vendor.price_unit}{vendor.price_amount.toLocaleString('en-IN')}</p>
-                          <p className="text-dark-400 text-xs">{vendor.price_label}</p>
+                          <p className="font-display font-bold text-sage-900 text-lg">{vendor.price_unit || '₹'}{(Number(vendor.price_amount) || 0).toLocaleString('en-IN')}</p>
+                          <p className="text-dark-400 text-xs">{vendor.price_label || 'onwards'}</p>
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/book/${vendor.slug}`); }}

@@ -92,7 +92,7 @@ function VendorFlipCard({
             {/* Price Badge floating top right (below buttons) */}
             <div className="absolute top-15 right-4 bg-white/90 backdrop-blur-md border border-white/40 rounded-full px-3 py-1 shadow-sm">
               <span className="text-sage-950 text-xs font-extrabold">
-                {vendor.price_unit}{vendor.price_amount.toLocaleString('en-IN')}
+                {vendor.price_unit || '₹'}{(Number(vendor.price_amount) || 0).toLocaleString('en-IN')}
               </span>
             </div>
 

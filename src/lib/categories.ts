@@ -273,6 +273,48 @@ export const CATEGORIES: CategoryDef[] = [
 
 export const CATEGORY_LABELS = CATEGORIES.map(c => c.label);
 
+export const ALL_CATEGORIES = Array.from(new Set([
+  ...CATEGORY_LABELS,
+  'Wedding Planner',
+  'Videographer',
+  'Venue',
+  'Event Rental',
+  'Invitation Designer',
+  'Entertainment',
+  'Event Provider',
+]));
+
 export function getCategory(label: string): CategoryDef | undefined {
-  return CATEGORIES.find(c => c.label === label);
+  if (!label) return undefined;
+  const target = label.toLowerCase().trim();
+
+  // 1. Exact case-insensitive match
+  const exactMatch = CATEGORIES.find(c => c.label.toLowerCase() === target);
+  if (exactMatch) return exactMatch;
+
+  // 2. Synonyms & aliases
+  if (target.includes('photo') || target.includes('camera') || target.includes('videog')) {
+    return CATEGORIES.find(c => c.label === 'Photographer');
+  }
+  if (target.includes('decor')) {
+    return CATEGORIES.find(c => c.label === 'Decorator');
+  }
+  if (target.includes('cater')) {
+    return CATEGORIES.find(c => c.label === 'Catering');
+  }
+  if (target.includes('venue') || target.includes('hall') || target.includes('banquet')) {
+    return CATEGORIES.find(c => c.label === 'Wedding Hall');
+  }
+  if (target.includes('makeup') || target.includes('beauty')) {
+    return CATEGORIES.find(c => c.label === 'Makeup');
+  }
+  if (target.includes('dj') || target.includes('music') || target.includes('sound')) {
+    return CATEGORIES.find(c => c.label === 'DJ');
+  }
+
+  // 3. Substring match fallback
+  return CATEGORIES.find(
+    c => c.label.toLowerCase().includes(target) || target.includes(c.label.toLowerCase())
+  );
 }
+

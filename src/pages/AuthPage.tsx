@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Sparkles, Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft,
   CheckCircle2, Building2, Users, Shield, Zap,
-  Store, Search, CalendarCheck,
+  Store, Search, CalendarCheck, ChevronDown, Tag,
   TrendingUp, Heart, Briefcase, Phone, FileText, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth, type UserRole } from '../lib/auth';
+import { ALL_CATEGORIES } from '../lib/categories';
 
 /* ── Data ───────────────────────────────────────────────────────── */
 
@@ -79,7 +80,17 @@ export default function AuthPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [otpNotice, setOtpNotice] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['Photographer']);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [modalType, setModalType] = useState<'terms' | 'privacy' | null>(null);
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(cat)
+        ? prev.length > 1 ? prev.filter((c) => c !== cat) : prev
+        : [...prev, cat]
+    );
+  };
 
   useEffect(() => {
     let t: any;
@@ -195,10 +206,11 @@ export default function AuthPage() {
             const vendorName = name?.trim() || autoName;
             const isStudio = vendorName.toLowerCase().includes('studio') || vendorName.toLowerCase().includes('events') || vendorName.toLowerCase().includes('photography');
             const businessName = isStudio ? vendorName : `${vendorName} Events`;
+            const finalCategoryStr = selectedCategories.length > 0 ? selectedCategories.join(', ') : 'Photographer';
             const newPendingEntry = {
               id: `VND-${Math.floor(100000 + Math.random() * 900000)}`,
               name: businessName,
-              category: 'Event Provider',
+              category: finalCategoryStr,
               location: 'Hyderabad, India',
               price_amount: 25000,
               price_label: 'Starting Package',
@@ -257,7 +269,8 @@ export default function AuthPage() {
         navigate(role === 'vendor' ? '/vendor-dashboard' : '/dashboard');
       } else {
         if (!role) { setLoading(false); return; }
-        const { error } = await signUp(email.trim(), password, name || 'New Account', role);
+        const finalCatStr = selectedCategories.length > 0 ? selectedCategories.join(', ') : 'Photographer';
+        const { error } = await signUp(email.trim(), password, name || 'New Account', role, finalCatStr);
         setLoading(false);
         if (error && !error.toLowerCase().includes('failed to fetch')) {
           setError(error);
@@ -510,6 +523,84 @@ export default function AuthPage() {
                             className="w-full pl-10 pr-4 py-2.5 border border-sage-100 rounded-2xl text-sm text-dark-800 bg-white/50 focus:bg-white outline-none transition-all focus:ring-2 focus:ring-sage-500/15 focus:border-sage-500 font-medium"
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {mode === 'signup' && isVendor && (
+                      <div className="animate-fade-up space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-dark-700 font-bold text-xs flex items-center gap-1.5">
+                            <Tag className="w-3.5 h-3.5 text-sage-600" />
+                            <span>Business Categories</span>
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sage-100 text-sage-800 border border-sage-200">
+                              {selectedCategories.length} selected
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedCategories(
+                                  selectedCategories.length === ALL_CATEGORIES.length
+                                    ? ['Photographer']
+                                    : [...ALL_CATEGORIES]
+                                )
+                              }
+                              className="text-[10px] text-sage-700 hover:text-sage-900 font-bold underline transition-colors"
+                            >
+                              {selectedCategories.length === ALL_CATEGORIES.length ? 'Clear All' : 'Select All'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inline Checkbox Grid Box */}
+                        <div className="bg-white/90 backdrop-blur-sm border border-sage-200/80 rounded-2xl p-3 max-h-48 overflow-y-auto shadow-inner space-y-1">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {ALL_CATEGORIES.map((cat) => {
+                              const isChecked = selectedCategories.includes(cat);
+                              return (
+                                <label
+                                  key={cat}
+                                  className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer text-xs transition-all border ${
+                                    isChecked
+                                      ? 'bg-sage-50 border-sage-300 text-sage-900 font-bold shadow-xs'
+                                      : 'bg-cream-50/40 border-sage-100/50 hover:bg-cream-50 text-dark-700 font-medium'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleCategory(cat)}
+                                    className="w-3.5 h-3.5 rounded border-sage-300 text-sage-700 focus:ring-sage-500 cursor-pointer accent-sage-700"
+                                  />
+                                  <span className="truncate">{cat}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Selected Category Badges */}
+                        {selectedCategories.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-0.5 max-h-20 overflow-y-auto">
+                            {selectedCategories.map((cat) => (
+                              <span
+                                key={cat}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-sage-100 text-sage-900 border border-sage-200/80 shadow-2xs"
+                              >
+                                {cat}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCategory(cat)}
+                                  className="text-sage-500 hover:text-red-600 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 

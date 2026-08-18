@@ -226,7 +226,7 @@ export default function ExplorePage() {
                       <div className="flex items-center justify-between pt-3 border-t border-sage-50">
                         <div>
                           <span className="text-dark-400 text-xs">Starting from</span>
-                          <p className="font-display font-bold text-sage-900">{vendor.price_unit}{Number(vendor.price_amount).toLocaleString('en-IN')}</p>
+                          <p className="font-display font-bold text-sage-900">{vendor.price_unit || '₹'}{(Number(vendor.price_amount) || 0).toLocaleString('en-IN')}</p>
                         </div>
                         <div className="w-9 h-9 rounded-xl bg-sage-50 group-hover:bg-sage-100 flex items-center justify-center transition-colors">
                           <ArrowRight className="w-4 h-4 text-sage-600 group-hover:translate-x-0.5 transition-transform" />

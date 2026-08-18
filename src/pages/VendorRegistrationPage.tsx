@@ -6,12 +6,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ALL_CATEGORIES } from '../lib/categories';
 
-const CATEGORIES_LIST = [
-  'Wedding Planner', 'Photographer', 'Videographer', 'Caterer',
-  'Decorator', 'Makeup Artist', 'Venue', 'DJ', 'Entertainment',
-  'Invitation Designer', 'Mehendi Artist', 'Transportation', 'Event Rental'
-];
+const CATEGORIES_LIST = ALL_CATEGORIES;
 
 const SERVICE_AREAS_OPTIONS = ['Bangalore', 'Hyderabad', 'Chennai', 'Mysore'];
 const EXPERIENCE_OPTIONS = ['Fresher', '1–2 Years', '3–5 Years', '5–10 Years', '10+ Years'];
@@ -37,9 +34,18 @@ export default function VendorRegistrationPage() {
   // Step 2: Business Information
   const [businessName, setBusinessName] = useState('');
   const [ownerName, setOwnerName] = useState('');
-  const [category, setCategory] = useState('Wedding Planner');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['Photographer']);
+  const category = selectedCategories.length > 0 ? selectedCategories.join(', ') : 'Photographer';
   const [subcategory, setSubcategory] = useState('');
   const [description, setDescription] = useState('');
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(cat)
+        ? prev.length > 1 ? prev.filter((c) => c !== cat) : prev
+        : [...prev, cat]
+    );
+  };
 
   // Step 3: Business Address
   const [country, setCountry] = useState('India');
@@ -604,18 +610,35 @@ export default function VendorRegistrationPage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-dark-500 uppercase">Business Category *</label>
-                        <select
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value)}
-                          className="w-full bg-cream-50 border border-dark-100 rounded-xl px-4 py-2.5 mt-1.5 text-sm outline-none font-medium"
-                        >
-                          {CATEGORIES_LIST.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
+                    <div>
+                      <div className="flex items-center justify-between mt-1 mb-1.5">
+                        <label className="block text-xs font-bold text-dark-500 uppercase">Business Categories *</label>
+                        <span className="text-xs text-sage-700 font-semibold">{selectedCategories.length} selected</span>
                       </div>
+                      <div className="bg-cream-50 border border-dark-100 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {CATEGORIES_LIST.map(cat => {
+                            const isChecked = selectedCategories.includes(cat);
+                            return (
+                              <label
+                                key={cat}
+                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
+                                  isChecked ? 'bg-sage-100 text-sage-900 font-bold' : 'hover:bg-white text-dark-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleCategory(cat)}
+                                  className="w-3.5 h-3.5 rounded border-dark-200 text-sage-700 focus:ring-sage-500 cursor-pointer accent-sage-700"
+                                />
+                                <span>{cat}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                       <div>
                         <label className="block text-xs font-bold text-dark-500 uppercase">Subcategory / Speciality</label>
                         <input

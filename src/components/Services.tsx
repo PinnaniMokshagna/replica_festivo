@@ -11,10 +11,10 @@ export default function Services() {
 
   const filteredCategories = CATEGORIES.filter((cat) => {
     if (activeTab === 'popular') {
-      return ['Photographer', 'Decorator', 'Catering', 'DJ', 'Wedding Hall', 'Mehendi Artist'].includes(cat.label);
+      return ['Photographer', 'Decorator', 'Catering', 'DJ', 'Wedding Hall', 'Mehendi Artist', 'Makeup'].includes(cat.label);
     }
     if (activeTab === 'essential') {
-      return ['Tent House', 'Lights', 'Makeup', 'Travel', 'Pandit', 'Flower Decor', 'Anchor', 'Band'].includes(cat.label);
+      return ['Photographer', 'Tent House', 'Lights', 'Makeup', 'Travel', 'Pandit', 'Flower Decor', 'Anchor', 'Band', 'Decorator'].includes(cat.label);
     }
     return true;
   });
