@@ -116,14 +116,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
           )}
         </motion.button>
 
-        {/* Wallet */}
-        <button
-          onClick={() => navigate('/vendor-dashboard/earnings')}
-          className="hidden h-11 items-center gap-2 rounded-xl border border-border bg-card/90 px-3.5 text-sm font-semibold text-dark-900 transition-colors hover:bg-muted sm:flex shadow-sm"
-        >
-          <Wallet className="h-4 w-4 text-primary" />
-          ₹{totalEarnings.toLocaleString('en-IN')}
-        </button>
+
 
         {/* Avatar with photo upload */}
         <div className="relative">

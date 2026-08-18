@@ -46,19 +46,15 @@ const routeMap: Record<string, string> = {
   'Verify Documents': '/vendor-dashboard/verify-documents',
   Bookings: '/vendor-dashboard/bookings',
   Calendar: '/vendor-dashboard/calendar',
-  Messages: '/vendor-dashboard/messages',
   Portfolio: '/vendor-dashboard/portfolio',
   Packages: '/vendor-dashboard/packages',
   Reviews: '/vendor-dashboard/reviews',
-  Earnings: '/vendor-dashboard/earnings',
-  Analytics: '/vendor-dashboard/analytics',
-  Deals: '/vendor-dashboard/deals',
   Settings: '/vendor-dashboard/settings',
   Support: '/vendor-dashboard/support',
 };
 
 // Gated menu items that require KYC verification
-const gatedItems = ['Bookings', 'Packages', 'Earnings', 'Deals', 'Messages', 'Analytics'];
+const gatedItems = ['Bookings', 'Packages'];
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -206,16 +202,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         {/* Auth / Logout */}
         <div className="border-t border-border p-4 space-y-1">
-          <button
-            onClick={() => {
-              setAuthModalOpen(true);
-              onClose();
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-dark-700 transition-colors hover:bg-muted"
-          >
-            <Settings className="h-[18px] w-[18px] text-muted-foreground" />
-            Account & Auth
-          </button>
+
           <button
             onClick={async () => {
               logout();
