@@ -400,7 +400,6 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <>
-        <Navbar />
         <div className="min-h-screen bg-cream-50 flex items-center justify-center">
           <div className="w-16 h-16 border-4 border-sage-200 border-t-sage-600 rounded-full animate-spin" />
         </div>
@@ -410,7 +409,6 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <Navbar />
       <div className="min-h-screen bg-cream-50/50 pt-16">
         {/* Header */}
         <div className="bg-gradient-to-r from-sage-900 to-sage-800 py-8 relative overflow-hidden">
