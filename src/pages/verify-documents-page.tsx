@@ -166,22 +166,21 @@ export function VerifyDocumentsPage() {
         submittedAt: new Date().toLocaleDateString('en-IN')
       };
 
-      safeSetItem('vendor_kyc_record', JSON.stringify(kycRecordPayload));
+      // Use direct localStorage for KYC record keys — safeSetItem strips real base64 images
+      // Images are already compressed to ~30-60KB by compressImage() so quota is safe
+      try { localStorage.setItem('vendor_kyc_record', JSON.stringify(kycRecordPayload)); } catch (e) {}
       if (userEmailLower) {
-        safeSetItem(`vendor_kyc_record_${userEmailLower}`, JSON.stringify(kycRecordPayload));
-        safeSetItem(`festivo_kyc_status_${userEmailLower}`, 'Pending Verification');
+        try { localStorage.setItem(`vendor_kyc_record_${userEmailLower}`, JSON.stringify(kycRecordPayload)); } catch (e) {}
+        try { localStorage.setItem(`festivo_kyc_status_${userEmailLower}`, 'Pending Verification'); } catch (e) {}
       }
 
       const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
       
-      // Find matching index in pending vendors by email, id, or vendor name
+      // Find matching index in pending vendors — only match by email or Supabase user id
       let existingIndex = pendingList.findIndex((p: any) => {
         const pEmail = (p.details?.email || '').toLowerCase().trim();
-        const pName = (p.name || '').toLowerCase().trim();
         return (userEmailLower && pEmail && pEmail === userEmailLower) ||
-               (pName && pName === bName.toLowerCase().trim()) ||
-               (p.id && user?.id && p.id === user.id) ||
-               pName.includes('vendor') || pEmail.includes('vendor');
+               (p.id && user?.id && p.id === user.id);
       });
 
       const kycVendorRecord = {
@@ -207,8 +206,26 @@ export function VerifyDocumentsPage() {
           address: user?.location || activeProfile.location || 'Hyderabad, India',
           registrationDate: new Date().toISOString().split('T')[0],
           status: 'Pending Verification',
-          kyc: kycPayload
+          kyc: {
+            idNumber: finalIdNumber,
+            aadhaarFront: finalGovtIdFile,
+            cancelledCheque: finalBankProofFile,
+            businessRegFile: businessRegFile || undefined,
+            businessRegNumber: businessRegNumber || undefined,
+            submittedAt: new Date().toLocaleDateString('en-IN')
+          }
         }
+      };
+
+      // In festivo_pending_vendors, store only metadata (no raw base64)
+      // Real uploaded images live in vendor_kyc_record_${email} and are merged by the admin scanner
+      const kycMeta = {
+        idNumber: finalIdNumber,
+        aadhaarFront: finalGovtIdFile.startsWith('data:') ? 'kyc_uploaded' : finalGovtIdFile,
+        cancelledCheque: finalBankProofFile.startsWith('data:') ? 'kyc_uploaded' : finalBankProofFile,
+        businessRegFile: businessRegFile ? (businessRegFile.startsWith('data:') ? 'kyc_uploaded' : businessRegFile) : undefined,
+        businessRegNumber: businessRegNumber || undefined,
+        submittedAt: new Date().toLocaleDateString('en-IN')
       };
 
       if (existingIndex >= 0) {
@@ -219,15 +236,16 @@ export function VerifyDocumentsPage() {
           details: {
             ...pendingList[existingIndex].details,
             ...kycVendorRecord.details,
-            kyc: kycPayload
+            kyc: kycMeta
           }
         };
       } else {
-        pendingList.unshift(kycVendorRecord);
+        pendingList.unshift({ ...kycVendorRecord, details: { ...kycVendorRecord.details, kyc: kycMeta } });
       }
 
       safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
-      safeSetItem('vendor_kyc_status', 'pending');
+      try { localStorage.setItem('vendor_kyc_status', 'pending'); } catch (e) {}
+
 
       // Update vendor_user_profile
       safeSetItem('vendor_user_profile', JSON.stringify({

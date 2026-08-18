@@ -77,14 +77,20 @@ export default function AdminDashboard() {
 
       pendingList = pendingList.map((app: any) => {
         const appEmail = (app.details?.email || '').toLowerCase().trim();
+        // Always prefer dedicated kyc record key over the pending_vendors entry (which may have placeholder)
         const kRec = kycRecordsMap[appEmail] || fallbackKRecord;
         const kycStatusKey = appEmail ? localStorage.getItem(`festivo_kyc_status_${appEmail}`) : null;
         const isApproved = kycStatusKey === 'Approved' || app.verified === true;
 
         const rawId = kRec?.govtIdNumber || kRec?.idNumber || (app.details?.kyc?.idNumber && app.details.kyc.idNumber !== 'Not submitted' ? app.details.kyc.idNumber : '');
-        const frontImg = kRec?.govtIdFile || kRec?.aadhaarFront || app.details?.kyc?.aadhaarFront || '';
-        const chequeImg = kRec?.bankProofFile || kRec?.cancelledCheque || app.details?.kyc?.cancelledCheque || '';
-        const hasDocs = !!(frontImg || chequeImg || (rawId && rawId !== 'Not submitted'));
+        // Use kRec image if app has placeholder marker 'kyc_uploaded' OR if kRec has a real image
+        const appFront = app.details?.kyc?.aadhaarFront;
+        const appCheque = app.details?.kyc?.cancelledCheque;
+        const frontImg = kRec?.govtIdFile || kRec?.aadhaarFront || (appFront && appFront !== 'kyc_uploaded' ? appFront : '');
+        const chequeImg = kRec?.bankProofFile || kRec?.cancelledCheque || (appCheque && appCheque !== 'kyc_uploaded' ? appCheque : '');
+        // hasDocs is true if we have real images OR the kyc_uploaded marker
+        const hasUploadMarker = appFront === 'kyc_uploaded' || appCheque === 'kyc_uploaded';
+        const hasDocs = !!(frontImg || chequeImg || hasUploadMarker || (rawId && rawId !== 'Not submitted'));
 
         return {
           ...app,
@@ -105,6 +111,7 @@ export default function AdminDashboard() {
           }
         };
       });
+
     } catch (e) {}
 
     // Deduplicate by email/id
