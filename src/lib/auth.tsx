@@ -91,10 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string, role?: 'vendor' | 'customer') => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (!error) return { error: null };
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error && data?.user) {
+        await fetchProfile(data.user.id);
+        return { error: null };
+      }
+      if (error && !error.message.toLowerCase().includes('failed to fetch')) {
+        return { error: error.message };
+      }
     } catch (e) {
-      console.warn('Supabase auth network error, fallback to demo mode:', e);
+      console.warn('Supabase auth network error:', e);
     }
     // --- Look up registration data from festivo_pending_vendors by email ---
     let registeredVendorData: any = null;
