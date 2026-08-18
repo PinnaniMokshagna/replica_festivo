@@ -7,7 +7,7 @@ import {
   MessageSquare, PhoneCall, Send, X, ZoomIn, User, LifeBuoy, FileQuestion, Search, Camera, Upload, Trash2
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import type { Booking, Vendor } from '../lib/supabase';
+import { supabase, type Booking, type Vendor } from '../lib/supabase';
 import { MOCK_VENDORS } from '../lib/vendors';
 import { useSavedVendors } from '../lib/savedVendors';
 import { useUserAvatar } from '../lib/userAvatar';
@@ -100,51 +100,52 @@ export default function CustomerDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const loadBookings = () => {
-      // Load bookings directly from localStorage (no Supabase)
+    const loadBookings = async () => {
+      setLoading(true);
+      const userEmail = (user.email || '').trim().toLowerCase();
+      let userBookings: BookingWithVendor[] = [];
+
+      // 1. Fetch real bookings from Supabase database for this user's email
+      try {
+        const { data: dbBookings } = await supabase
+          .from('bookings')
+          .select('*, vendor:vendors(*)')
+          .eq('customer_email', userEmail);
+
+        if (dbBookings && dbBookings.length > 0) {
+          userBookings = dbBookings.map((b: any) => ({
+            ...b,
+            vendor: Array.isArray(b.vendor) ? b.vendor[0] : b.vendor
+          }));
+        }
+      } catch (e) {
+        console.warn('Could not fetch DB bookings:', e);
+      }
+
+      // 2. Fetch local storage bookings matching user's email
       const savedCustomerBookings = localStorage.getItem('festivo_customer_bookings');
       if (savedCustomerBookings) {
         try {
           const parsed = JSON.parse(savedCustomerBookings);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const normalized = parsed.map((b: any) => ({
-              ...b,
-              status: b.status || 'confirmed',
-              payment_status: b.payment_status || 'paid',
-              total_amount: b.total_amount || 0,
-              guests: b.guests || 1,
-              // Build nested vendor object from flat fields if not already present
-              vendor: b.vendor || {
-                id: b.vendor_id || '',
-                name: b.vendor_name || 'Event Vendor',
-                category: b.vendor_category || 'Event',
-                location: b.location || 'Hyderabad, India',
-                image: b.vendor_image || '',
-                slug: b.vendor_slug || '',
-                rating: 5.0,
-                reviews: 1,
-                verified: true,
-                price_amount: b.total_amount || 0,
-                price_label: 'Booking',
-                price_unit: '₹',
-                badge: 'Verified Partner',
-                badge_color: 'bg-sage-600',
-              },
-            }));
-            setBookings(normalized);
-            setLoading(false);
-            return;
+          if (Array.isArray(parsed)) {
+            const userLocal = parsed.filter((b: any) =>
+              (b.customer_email || '').trim().toLowerCase() === userEmail
+            );
+            userLocal.forEach((b: any) => {
+              if (!userBookings.some(existing => existing.id === b.id || existing.booking_ref === b.booking_ref)) {
+                userBookings.push(b);
+              }
+            });
           }
         } catch (e) {
           console.warn('Error parsing customer bookings:', e);
         }
       }
-      
-      // Default to DEMO_BOOKINGS if no bookings exist yet
-      localStorage.setItem('festivo_customer_bookings', JSON.stringify(DEMO_BOOKINGS));
-      setBookings(DEMO_BOOKINGS);
+
+      setBookings(userBookings);
       setLoading(false);
     };
+
     loadBookings();
     window.addEventListener('storage', loadBookings);
     return () => window.removeEventListener('storage', loadBookings);
