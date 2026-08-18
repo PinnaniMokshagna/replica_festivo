@@ -589,7 +589,7 @@ export default function AdminDashboard() {
                           {/* Card 1: Govt Photo ID */}
                           <div className="flex items-center justify-between p-3.5 bg-white rounded-2xl border border-sage-100 shadow-sm hover:border-sage-300 transition-all">
                             <div className="flex items-center gap-3 min-w-0">
-                              {app.details?.kyc?.aadhaarFront && (app.details.kyc.aadhaarFront.startsWith('data:image') || app.details.kyc.aadhaarFront.startsWith('http')) ? (
+                              {app.details?.kyc?.aadhaarFront && (app.details.kyc.aadhaarFront.startsWith('data:') || app.details.kyc.aadhaarFront.startsWith('http')) && !app.details.kyc.aadhaarFront.includes('photo-1618005182384') ? (
                                 <img
                                   src={app.details.kyc.aadhaarFront}
                                   alt="Govt Photo ID"
@@ -609,7 +609,7 @@ export default function AdminDashboard() {
 
                             <button
                               type="button"
-                              onClick={() => setSelectedDocPreview({ title: 'Government Photo ID (Aadhaar/PAN)', docType: 'Govt Photo ID', fileUrl: app.details?.kyc?.aadhaarFront || '', idNumber: app.details?.kyc?.idNumber || 'Attached', app })}
+                              onClick={() => setSelectedDocPreview({ title: 'Government Photo ID (Aadhaar/PAN)', docType: 'Govt Photo ID', fileUrl: app.details?.kyc?.aadhaarFront && !app.details.kyc.aadhaarFront.includes('photo-1618005182384') ? app.details.kyc.aadhaarFront : '', idNumber: app.details?.kyc?.idNumber || 'Attached', app })}
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-sage-50 hover:bg-sage-100 text-sage-800 font-extrabold text-xs rounded-xl border border-sage-200 transition-colors flex-shrink-0 cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5 text-sage-600" /> View Document
@@ -619,7 +619,7 @@ export default function AdminDashboard() {
                           {/* Card 2: Banking Proof */}
                           <div className="flex items-center justify-between p-3.5 bg-white rounded-2xl border border-sage-100 shadow-sm hover:border-sage-300 transition-all">
                             <div className="flex items-center gap-3 min-w-0">
-                              {app.details?.kyc?.cancelledCheque && (app.details.kyc.cancelledCheque.startsWith('data:image') || app.details.kyc.cancelledCheque.startsWith('http')) ? (
+                              {app.details?.kyc?.cancelledCheque && (app.details.kyc.cancelledCheque.startsWith('data:') || app.details.kyc.cancelledCheque.startsWith('http')) && !app.details.kyc.cancelledCheque.includes('photo-1618005182384') ? (
                                 <img
                                   src={app.details.kyc.cancelledCheque}
                                   alt="Banking Proof"
@@ -639,7 +639,7 @@ export default function AdminDashboard() {
 
                             <button
                               type="button"
-                              onClick={() => setSelectedDocPreview({ title: 'Banking Proof (Cancelled Cheque)', docType: 'Banking Proof', fileUrl: app.details?.kyc?.cancelledCheque || '', app })}
+                              onClick={() => setSelectedDocPreview({ title: 'Banking Proof (Cancelled Cheque)', docType: 'Banking Proof', fileUrl: app.details?.kyc?.cancelledCheque && !app.details.kyc.cancelledCheque.includes('photo-1618005182384') ? app.details.kyc.cancelledCheque : '', app })}
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-gold-50 hover:bg-gold-100 text-gold-900 font-extrabold text-xs rounded-xl border border-gold-200 transition-colors flex-shrink-0 cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5 text-gold-600" /> View Document
