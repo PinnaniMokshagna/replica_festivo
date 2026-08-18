@@ -77,13 +77,13 @@ export default function AdminDashboard() {
 
       pendingList = pendingList.map((app: any) => {
         const appEmail = (app.details?.email || '').toLowerCase().trim();
-        const kRec = kycRecordsMap[appEmail] || fallbackKRecord;
+        const kRec = kycRecordsMap[appEmail] || null;
         const kycStatusKey = appEmail ? localStorage.getItem(`festivo_kyc_status_${appEmail}`) : null;
         const isApproved = kycStatusKey === 'Approved' || app.verified === true;
 
-        const rawId = kRec?.govtIdNumber || kRec?.idNumber || (app.details?.kyc?.idNumber && app.details.kyc.idNumber !== 'Not submitted' ? app.details.kyc.idNumber : '');
-        const frontImg = kRec?.govtIdFile || kRec?.aadhaarFront || app.details?.kyc?.aadhaarFront || '';
-        const chequeImg = kRec?.bankProofFile || kRec?.cancelledCheque || app.details?.kyc?.cancelledCheque || '';
+        const rawId = app.details?.kyc?.idNumber || kRec?.govtIdNumber || kRec?.idNumber || '';
+        const frontImg = app.details?.kyc?.aadhaarFront || kRec?.govtIdFile || kRec?.aadhaarFront || '';
+        const chequeImg = app.details?.kyc?.cancelledCheque || kRec?.bankProofFile || kRec?.cancelledCheque || '';
         const hasDocs = !!(frontImg || chequeImg || (rawId && rawId !== 'Not submitted'));
 
         return {
