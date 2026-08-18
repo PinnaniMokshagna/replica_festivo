@@ -93,159 +93,192 @@ export function VerifyDocumentsPage() {
     setIsSubmitting(true);
 
     try {
-
-    let finalIdNumber = govtIdNumber.trim();
-    if (!finalIdNumber) {
-      finalIdNumber = '5482 9912 3014';
-      setGovtIdNumber(finalIdNumber);
-    }
-
-    let finalGovtIdFile = govtIdFile;
-    if (!finalGovtIdFile) {
-      finalGovtIdFile = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800';
-      setGovtIdFile(finalGovtIdFile);
-      setGovtIdFileName('Aadhaar_Govt_Photo_ID.png');
-    }
-
-    let finalBankProofFile = bankProofFile;
-    if (!finalBankProofFile) {
-      finalBankProofFile = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800';
-      setBankProofFile(finalBankProofFile);
-      setBankProofFileName('Cancelled_Cheque_Proof.png');
-    }
-
-    const vendorName = user?.fullName || 'Vendor Partner';
-    const bName = user?.businessName || `${vendorName} Events`;
-
-    submitKycDocuments({
-      govtIdType,
-      govtIdNumber: finalIdNumber,
-      govtIdFile: finalGovtIdFile,
-      businessRegNumber: businessRegNumber || undefined,
-      businessRegFile: businessRegFile || undefined,
-      bankProofFile: finalBankProofFile,
-    });
-
-    // PUSH NOTIFICATION & PENDING ENTRY FOR ADMIN DASHBOARD
-    const adminNotifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
-    const newAdminNotif = {
-      id: `AN-${Math.floor(100000 + Math.random() * 900000)}`,
-      type: 'kyc_submitted',
-      vendorId: `VND-${user?.id || 'NEW'}`,
-      vendorName: bName,
-      message: `KYC documents submitted by "${bName}" (${vendorName}) for verification (${govtIdType}: ${finalIdNumber}).`,
-      timestamp: new Date().toISOString(),
-      read: false
-    };
-    safeSetItem('festivo_admin_notifications', JSON.stringify([newAdminNotif, ...adminNotifications]));
-
-    const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
-    const userEmailLower = (user?.email || '').toLowerCase().trim();
-    
-    // Find matching index in pending vendors
-    let existingIndex = pendingList.findIndex((p: any) => 
-      (userEmailLower && p.details?.email && p.details.email.toLowerCase().trim() === userEmailLower) || 
-      p.name === bName || 
-      (p.id && user?.id && p.id === user.id)
-    );
-
-    const kycVendorRecord = {
-      id: user?.id || (existingIndex >= 0 ? pendingList[existingIndex].id : `VND-${Date.now()}`),
-      name: bName,
-      category: user?.category || 'Event Provider',
-      location: user?.location || 'Hyderabad, India',
-      price_amount: 45000,
-      price_label: 'Starting Package',
-      price_unit: 'event',
-      rating: 5.0,
-      reviews: 1,
-      image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-      logo: vendorName.slice(0, 2).toUpperCase() || 'VP',
-      verified: false,
-      badge: 'KYC Submitted',
-      badge_color: 'bg-gold-500',
-      slug: user?.username || (bName || 'vendor').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      details: {
-        email: user?.email || '',
-        phone: user?.phone || '+91 93475 67375',
-        owner: vendorName,
-        address: user?.location || 'Hyderabad, India',
-        registrationDate: new Date().toISOString().split('T')[0],
-        status: 'Pending Verification',
-        kyc: {
-          idNumber: finalIdNumber,
-          aadhaarFront: compactFileUrl(finalGovtIdFile, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'),
-          cancelledCheque: compactFileUrl(finalBankProofFile, 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800'),
-          businessRegFile: compactFileUrl(businessRegFile, 'uploaded_document.pdf'),
-          businessRegNumber: businessRegNumber || undefined,
-        }
+      let finalIdNumber = govtIdNumber.trim();
+      if (!finalIdNumber) {
+        finalIdNumber = '5482 9912 3014';
+        setGovtIdNumber(finalIdNumber);
       }
-    };
 
-    if (existingIndex >= 0) {
-      pendingList[existingIndex] = {
-        ...pendingList[existingIndex],
-        ...kycVendorRecord,
+      let finalGovtIdFile = govtIdFile;
+      if (!finalGovtIdFile) {
+        finalGovtIdFile = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800';
+        setGovtIdFile(finalGovtIdFile);
+        setGovtIdFileName('Aadhaar_Govt_Photo_ID.png');
+      }
+
+      let finalBankProofFile = bankProofFile;
+      if (!finalBankProofFile) {
+        finalBankProofFile = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800';
+        setBankProofFile(finalBankProofFile);
+        setBankProofFileName('Cancelled_Cheque_Proof.png');
+      }
+
+      const activeProfile = (() => {
+        try {
+          return JSON.parse(localStorage.getItem('vendor_user_profile') || '{}');
+        } catch {
+          return {};
+        }
+      })();
+
+      const userEmailLower = (user?.email || activeProfile.email || 'vendor@festivo.com').toLowerCase().trim();
+      const vendorName = user?.fullName || activeProfile.fullName || 'Vendor Partner';
+      const bName = user?.businessName || activeProfile.businessName || `${vendorName} Events`;
+
+      submitKycDocuments({
+        govtIdType,
+        govtIdNumber: finalIdNumber,
+        govtIdFile: finalGovtIdFile,
+        businessRegNumber: businessRegNumber || undefined,
+        businessRegFile: businessRegFile || undefined,
+        bankProofFile: finalBankProofFile,
+      });
+
+      // PUSH NOTIFICATION & PENDING ENTRY FOR ADMIN DASHBOARD
+      const adminNotifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
+      const newAdminNotif = {
+        id: `AN-${Math.floor(100000 + Math.random() * 900000)}`,
+        type: 'kyc_submitted',
+        vendorId: `VND-${user?.id || 'NEW'}`,
+        vendorName: bName,
+        message: `KYC documents submitted by "${bName}" (${vendorName}) for verification (${govtIdType}: ${finalIdNumber}).`,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+      safeSetItem('festivo_admin_notifications', JSON.stringify([newAdminNotif, ...adminNotifications]));
+
+      const kycPayload = {
+        idNumber: finalIdNumber,
+        aadhaarFront: finalGovtIdFile,
+        cancelledCheque: finalBankProofFile,
+        businessRegFile: businessRegFile || undefined,
+        businessRegNumber: businessRegNumber || undefined,
+        submittedAt: new Date().toLocaleDateString('en-IN')
+      };
+
+      const kycRecordPayload = {
+        govtIdType,
+        govtIdNumber: finalIdNumber,
+        govtIdFile: finalGovtIdFile,
+        businessRegNumber,
+        businessRegFile,
+        bankProofFile: finalBankProofFile,
+        submittedAt: new Date().toLocaleDateString('en-IN')
+      };
+
+      safeSetItem('vendor_kyc_record', JSON.stringify(kycRecordPayload));
+      if (userEmailLower) {
+        safeSetItem(`vendor_kyc_record_${userEmailLower}`, JSON.stringify(kycRecordPayload));
+        safeSetItem(`festivo_kyc_status_${userEmailLower}`, 'Pending Verification');
+      }
+
+      const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
+      
+      // Find matching index in pending vendors by email, id, or vendor name
+      let existingIndex = pendingList.findIndex((p: any) => {
+        const pEmail = (p.details?.email || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+        return (userEmailLower && pEmail && pEmail === userEmailLower) ||
+               (pName && pName === bName.toLowerCase().trim()) ||
+               (p.id && user?.id && p.id === user.id) ||
+               pName.includes('vendor') || pEmail.includes('vendor');
+      });
+
+      const kycVendorRecord = {
+        id: user?.id || (existingIndex >= 0 ? pendingList[existingIndex].id : `VND-${Date.now()}`),
         name: bName,
+        category: user?.category || 'Event Provider',
+        location: user?.location || 'Hyderabad, India',
+        price_amount: 45000,
+        price_label: 'Starting Package',
+        price_unit: 'event',
+        rating: 5.0,
+        reviews: 1,
+        image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
+        logo: vendorName.slice(0, 2).toUpperCase() || 'VP',
+        verified: false,
+        badge: 'KYC Submitted',
+        badge_color: 'bg-gold-500',
+        slug: user?.username || (bName || 'vendor').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         details: {
-          ...pendingList[existingIndex].details,
-          ...kycVendorRecord.details,
-          kyc: {
-            ...pendingList[existingIndex].details?.kyc,
-            ...kycVendorRecord.details.kyc,
-          }
+          email: userEmailLower,
+          phone: user?.phone || activeProfile.phone || '+91 93475 67375',
+          owner: vendorName,
+          address: user?.location || activeProfile.location || 'Hyderabad, India',
+          registrationDate: new Date().toISOString().split('T')[0],
+          status: 'Pending Verification',
+          kyc: kycPayload
         }
       };
-    } else {
-      pendingList.unshift(kycVendorRecord);
+
+      if (existingIndex >= 0) {
+        pendingList[existingIndex] = {
+          ...pendingList[existingIndex],
+          ...kycVendorRecord,
+          name: bName,
+          details: {
+            ...pendingList[existingIndex].details,
+            ...kycVendorRecord.details,
+            kyc: kycPayload
+          }
+        };
+      } else {
+        pendingList.unshift(kycVendorRecord);
+      }
+
+      safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
+      safeSetItem('vendor_kyc_status', 'pending');
+
+      // Update vendor_user_profile
+      safeSetItem('vendor_user_profile', JSON.stringify({
+        ...activeProfile,
+        status: 'Pending Verification',
+        verified: false,
+        fullName: vendorName,
+        businessName: bName,
+        email: userEmailLower,
+      }));
+
+      // Direct Supabase DB sync for vendor profile & KYC submission
+      if (user?.id) {
+        supabase.from('vendor_profiles').upsert({
+          user_id: user.id,
+          business_name: bName,
+          approval_status: 'pending',
+          documents_uploaded: true,
+        }).then(({ error }) => {
+          if (error) console.warn('Supabase vendor_profiles sync notice:', error.message);
+        });
+      }
+
+      try {
+        const channel = new BroadcastChannel('festivo_auth_channel');
+        channel.postMessage({ type: 'KYC_STATUS_CHANGED', status: 'pending', email: userEmailLower });
+        channel.close();
+      } catch (e) {}
+
+      window.dispatchEvent(new Event('storage'));
+
+      showToast('KYC Application Submitted Successfully! Application status is now Pending Review. Admin notified.');
+
+    } catch (err: any) {
+      console.error('KYC submit error:', err);
+      setSubmitError(err?.message || 'Failed to save documents. Try uploading smaller files.');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
-    safeSetItem('vendor_kyc_status', 'pending');
-    safeSetItem('vendor_kyc_record', JSON.stringify({
-      govtIdType,
-      govtIdNumber: finalIdNumber,
-      govtIdFile: compactFileUrl(finalGovtIdFile, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'),
-      businessRegNumber,
-      businessRegFile: compactFileUrl(businessRegFile, 'uploaded_document.pdf'),
-      bankProofFile: compactFileUrl(finalBankProofFile, 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800'),
-      submittedAt: new Date().toLocaleDateString('en-IN')
-    }));
+      try {
+        const channel = new BroadcastChannel('festivo_auth_channel');
+        channel.postMessage({ type: 'KYC_STATUS_CHANGED', status: 'pending', email: userEmailLower });
+        channel.close();
+      } catch (e) {}
 
-    if (user?.email) {
-      safeSetItem(`festivo_kyc_status_${user.email.toLowerCase().trim()}`, 'Pending Verification');
-    }
+      window.dispatchEvent(new Event('storage'));
 
-    // Direct Supabase DB sync for vendor profile & KYC submission
-    if (user?.id) {
-      supabase.from('vendor_profiles').upsert({
-        user_id: user.id,
-        business_name: bName,
-        approval_status: 'pending',
-        documents_uploaded: true,
-      }).then(({ error }) => {
-        if (error) console.warn('Supabase vendor_profiles sync notice:', error.message);
-      });
-    }
+      showToast('KYC Application Submitted Successfully! Application status is now Pending Review. Admin notified.');
 
-    // Also update vendor_user_profile with updated studio name and business details
-    const activeProfile = JSON.parse(localStorage.getItem('vendor_user_profile') || '{}');
-    safeSetItem('vendor_user_profile', JSON.stringify({
-      ...activeProfile,
-      fullName: vendorName,
-      businessName: bName,
-      email: user?.email || activeProfile.email || '',
-    }));
-
-    try {
-      const channel = new BroadcastChannel('festivo_auth_channel');
-      channel.postMessage({ type: 'KYC_STATUS_CHANGED', status: 'pending', email: user?.email });
-      channel.close();
-    } catch (e) {}
-
-    window.dispatchEvent(new Event('storage'));
-
-    showToast('KYC Application Submitted Successfully! Application status is now Pending Review. Admin notified.');
     } catch (err: any) {
       console.error('KYC submit error:', err);
       setSubmitError(err?.message || 'Failed to save documents. Try uploading smaller files.');

@@ -43,6 +43,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .maybeSingle();
     setProfile(data);
+
+    if (data) {
+      localStorage.setItem('festivo_profile', JSON.stringify(data));
+      const s = await supabase.auth.getSession();
+      const currentUser = s?.data?.session?.user;
+      if (currentUser) {
+        localStorage.setItem('festivo_user', JSON.stringify(currentUser));
+        const userFullName = data.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Vendor';
+        const isStudio = userFullName.toLowerCase().includes('studio') || userFullName.toLowerCase().includes('events') || userFullName.toLowerCase().includes('photography');
+        const businessName = isStudio ? userFullName : `${userFullName} Events`;
+        const slug = (userFullName || currentUser.email?.split('@')[0] || 'vendor').toLowerCase().replace(/[^a-z0-9]+/g, '.');
+
+        if (data.role === 'vendor' || currentUser.email?.includes('vendor')) {
+          const vendorProfile = {
+            id: currentUser.id,
+            email: (currentUser.email || '').toLowerCase().trim(),
+            fullName: userFullName,
+            businessName,
+            category: 'Event Provider',
+            location: data.city ? `${data.city}, India` : 'Hyderabad, India',
+            phone: data.phone || '+91 98765 43210',
+            username: slug,
+          };
+          localStorage.setItem('vendor_user_profile', JSON.stringify(vendorProfile));
+          localStorage.setItem('vendor_is_authenticated', 'true');
+        }
+        window.dispatchEvent(new Event('storage'));
+      }
+    }
   };
 
   useEffect(() => {
@@ -94,8 +123,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const emailLower = (email || '').trim().toLowerCase();
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: emailLower, password });
-      if (!error && data?.user) {
-        await fetchProfile(data.user.id);
+      if (data?.session) {
+        const { data: dbProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.session.user.id)
+          .maybeSingle();
+
+        const finalProfile = dbProfile || {
+          id: data.session.user.id,
+          full_name: data.session.user.user_metadata?.full_name || emailLower.split('@')[0],
+          role: role || 'vendor',
+          phone: '+91 98765 43210',
+          city: 'Hyderabad',
+          avatar_url: null
+        };
+
+        setSession(data.session);
+        setUser(data.session.user);
+        setProfile(finalProfile);
+
+        localStorage.setItem('festivo_user', JSON.stringify(data.session.user));
+        localStorage.setItem('festivo_profile', JSON.stringify(finalProfile));
+
+        const userFullName = finalProfile.full_name || data.session.user.user_metadata?.full_name || emailLower.split('@')[0];
+        const isStudio = userFullName.toLowerCase().includes('studio') || userFullName.toLowerCase().includes('events') || userFullName.toLowerCase().includes('photography');
+        const businessName = isStudio ? userFullName : `${userFullName} Events`;
+        const slug = (userFullName || emailLower.split('@')[0]).toLowerCase().replace(/[^a-z0-9]+/g, '.');
+
+        const vendorProfile = {
+          id: data.session.user.id,
+          email: emailLower,
+          fullName: userFullName,
+          businessName,
+          category: 'Event Provider',
+          location: finalProfile.city ? `${finalProfile.city}, India` : 'Hyderabad, India',
+          phone: finalProfile.phone || '+91 98765 43210',
+          username: slug,
+        };
+
+        localStorage.setItem('vendor_user_profile', JSON.stringify(vendorProfile));
+        localStorage.setItem('vendor_is_authenticated', 'true');
+        window.dispatchEvent(new Event('storage'));
+        try {
+          const channel = new BroadcastChannel('festivo_auth_channel');
+          channel.postMessage({ type: 'AUTH_STATE_CHANGED', user: vendorProfile });
+          channel.close();
+        } catch (e) {}
+
         return { error: null };
       }
       if (error && !error.message.toLowerCase().includes('failed to fetch')) {
@@ -104,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Supabase auth network error:', e);
     }
+
     // --- Look up registration data from festivo_pending_vendors by email ---
     let registeredVendorData: any = null;
     try {

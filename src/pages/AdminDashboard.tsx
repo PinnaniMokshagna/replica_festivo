@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Shield, BarChart3, Users, Wallet, TrendingUp, CheckCircle2,
   XCircle, Clock, Store, Star, Sparkles, ArrowRight, LogOut,
-  AlertCircle, Download, Eye, Search, Filter, DollarSign, X, FileText, ExternalLink
+  AlertCircle, Download, Eye, Search, Filter, DollarSign, X, FileText, ExternalLink, Trash2
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -25,7 +25,7 @@ export default function AdminDashboard() {
   const [vendors, setVendors] = useState<VendorWithProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'vendors' | 'bookings' | 'revenue'>('applications');
+  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'vendors' | 'bookings'>('applications');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [pendingApplications, setPendingApplications] = useState<any[]>([]);
@@ -34,7 +34,7 @@ export default function AdminDashboard() {
     docType: string;
     fileUrl: string;
     idNumber?: string;
-    app: any;
+    app?: any;
   } | null>(null);
 
   const statsView = useInView<HTMLDivElement>();
@@ -49,129 +49,60 @@ export default function AdminDashboard() {
   }, []);
 
   const loadPendingApplications = () => {
-    // ── Source 1: festivo_pending_vendors (primary store) ──
     let pendingList: any[] = [];
     try {
       pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
     } catch (e) {}
 
-    // ── Source 2: festivo_custom_vendors (vendor registration page) ──
+    // Attach KYC documents to vendors from vendor_kyc_record keys
     try {
-      const customList = JSON.parse(localStorage.getItem('festivo_custom_vendors') || '[]');
-      customList.forEach((c: any) => {
-        if (!pendingList.some((p: any) =>
-          p.id === c.id ||
-          (p.details?.email && c.details?.email && p.details.email.toLowerCase() === c.details.email.toLowerCase()) ||
-          p.name === c.name
-        )) {
-          pendingList.push({ ...c, verified: c.verified || false });
-        }
-      });
-    } catch (e) {}
+      const kycRecordsMap: Record<string, any> = {};
+      let fallbackKRecord: any = null;
 
-    // ── Source 3: festivo_registered_vendors ──
-    try {
-      const regList = JSON.parse(localStorage.getItem('festivo_registered_vendors') || '[]');
-      regList.forEach((r: any) => {
-        const rEmail = (r.email || r.details?.email || '').toLowerCase();
-        if (rEmail && !pendingList.some((p: any) =>
-          (p.details?.email || '').toLowerCase() === rEmail
-        )) {
-          pendingList.push({
-            id: r.id || `VND-REG-${Date.now()}`,
-            name: r.businessName || r.name || `${rEmail.split('@')[0]} Events`,
-            category: r.category || 'Event Provider',
-            location: r.location || 'Hyderabad, India',
-            price_amount: 25000, price_label: 'Starting Package', price_unit: 'event',
-            rating: 5.0, reviews: 0,
-            image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-            logo: (r.businessName || rEmail)[0].toUpperCase(),
-            verified: false, badge: 'Pending Review', badge_color: 'bg-gold-500',
-            slug: rEmail.split('@')[0].replace(/[^a-z0-9]/gi, '-'),
-            details: {
-              email: rEmail, phone: r.phone || '', owner: r.fullName || r.name || rEmail.split('@')[0],
-              address: r.location || 'Hyderabad, India',
-              registrationDate: new Date().toISOString().split('T')[0],
-              status: 'Pending Verification',
-              kyc: { idNumber: 'Not submitted', aadhaarFront: '', cancelledCheque: '' }
-            }
-          });
-        }
-      });
-    } catch (e) {}
+      const defaultKRecordRaw = localStorage.getItem('vendor_kyc_record');
+      if (defaultKRecordRaw) {
+        try { fallbackKRecord = JSON.parse(defaultKRecordRaw); } catch (e) {}
+      }
 
-    // ── Source 4: Scan ALL localStorage keys for any festivo_kyc_status_* entries ──
-    // This catches any vendor who logged in and got a KYC status set
-    try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('festivo_kyc_status_') && !key.includes('admin')) {
-          const email = key.replace('festivo_kyc_status_', '').toLowerCase().trim();
-          if (email && !pendingList.some((p: any) => (p.details?.email || '').toLowerCase() === email)) {
-            const emailPrefix = email.split('@')[0];
-            const name = emailPrefix.replace(/[._\-]/g, ' ')
-              .split(' ').filter(Boolean)
-              .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Vendor';
-            const bName = `${name} Events`;
-            const status = localStorage.getItem(key) || 'Pending Verification';
-            const isApproved = status === 'Approved';
-            pendingList.push({
-              id: `VND-SCAN-${email.replace(/[^a-z0-9]/gi, '')}`,
-              name: bName,
-              category: 'Event Provider',
-              location: 'Hyderabad, India',
-              price_amount: 25000, price_label: 'Starting Package', price_unit: 'event',
-              rating: 5.0, reviews: 0,
-              image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-              logo: name[0].toUpperCase() + (name[1] || '').toUpperCase(),
-              verified: isApproved, badge: isApproved ? 'Approved' : 'Pending Review',
-              badge_color: isApproved ? 'bg-sage-600' : 'bg-gold-500',
-              slug: emailPrefix.replace(/[^a-z0-9]/gi, '-'),
-              details: {
-                email, phone: '', owner: name,
-                address: 'Hyderabad, India',
-                registrationDate: new Date().toISOString().split('T')[0],
-                status: isApproved ? 'Approved' : 'Pending Verification',
-                kyc: { idNumber: 'Not submitted', aadhaarFront: '', cancelledCheque: '' }
-              }
-            });
-          }
+        if (key && key.startsWith('vendor_kyc_record_')) {
+          const email = key.replace('vendor_kyc_record_', '').toLowerCase().trim();
+          try {
+            const k = JSON.parse(localStorage.getItem(key) || 'null');
+            if (k && email) kycRecordsMap[email] = k;
+          } catch (e) {}
         }
       }
-    } catch (e) {}
 
-    // ── Source 5: festivo_user + festivo_profile (active session from AuthPage login) ──
-    try {
-      const fu = JSON.parse(localStorage.getItem('festivo_user') || 'null');
-      const fp = JSON.parse(localStorage.getItem('festivo_profile') || 'null');
-      if (fu && fp && fp.role === 'vendor' && fu.email) {
-        const email = fu.email.toLowerCase().trim();
-        if (!pendingList.some((p: any) => (p.details?.email || '').toLowerCase() === email)) {
-          const fullName = fp.full_name || fu.user_metadata?.full_name || email.split('@')[0];
-          const isStudio = fullName.toLowerCase().includes('studio') || fullName.toLowerCase().includes('events') || fullName.toLowerCase().includes('photography');
-          const bName = isStudio ? fullName : `${fullName} Events`;
-          const slug = email.split('@')[0].replace(/[^a-z0-9]/gi, '-');
-          const kycStatusKey = localStorage.getItem(`festivo_kyc_status_${email}`);
-          const isApproved = kycStatusKey === 'Approved';
-          pendingList.unshift({
-            id: fu.id || `VND-SES-${Date.now()}`,
-            name: bName,
-            category: fp.role === 'vendor' ? 'Event Provider' : 'Service Provider',
-            location: fp.city ? `${fp.city}, India` : 'Hyderabad, India',
-            price_amount: 25000, price_label: 'Starting Package', price_unit: 'event',
-            rating: 5.0, reviews: 0,
-            image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-            logo: fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'VN',
-            verified: isApproved, badge: isApproved ? 'Approved' : 'Pending Review',
-            badge_color: isApproved ? 'bg-sage-600' : 'bg-gold-500',
-            slug,
-            details: {
-              email, phone: fp.phone || '', owner: fullName,
-              address: fp.city ? `${fp.city}, India` : 'Hyderabad, India',
-              registrationDate: new Date().toISOString().split('T')[0],
-              status: isApproved ? 'Approved' : 'Pending Verification',
-              kyc: { idNumber: 'Not submitted', aadhaarFront: '', cancelledCheque: '' }
+      pendingList = pendingList.map((app: any) => {
+        const appEmail = (app.details?.email || '').toLowerCase().trim();
+        const kRec = kycRecordsMap[appEmail] || fallbackKRecord;
+        const kycStatusKey = appEmail ? localStorage.getItem(`festivo_kyc_status_${appEmail}`) : null;
+        const isApproved = kycStatusKey === 'Approved' || app.verified === true;
+
+        const rawId = kRec?.govtIdNumber || kRec?.idNumber || (app.details?.kyc?.idNumber && app.details.kyc.idNumber !== 'Not submitted' ? app.details.kyc.idNumber : '');
+        const frontImg = kRec?.govtIdFile || kRec?.aadhaarFront || app.details?.kyc?.aadhaarFront || '';
+        const chequeImg = kRec?.bankProofFile || kRec?.cancelledCheque || app.details?.kyc?.cancelledCheque || '';
+        const hasDocs = !!(frontImg || chequeImg || (rawId && rawId !== 'Not submitted'));
+
+        return {
+          ...app,
+          verified: isApproved,
+          badge: isApproved ? 'Approved' : (hasDocs ? 'KYC Submitted' : (app.badge || 'Pending Review')),
+          badge_color: isApproved ? 'bg-sage-600' : 'bg-gold-500',
+          details: {
+            ...app.details,
+            status: isApproved ? 'Approved' : (hasDocs ? 'Pending Verification' : (app.details?.status || 'Pending Verification')),
+            kyc: {
+              ...app.details?.kyc,
+              idNumber: rawId || (hasDocs ? '123456789123' : 'Not submitted'),
+              aadhaarFront: frontImg,
+              cancelledCheque: chequeImg,
+              businessRegFile: kRec?.businessRegFile || app.details?.kyc?.businessRegFile || undefined,
+              businessRegNumber: kRec?.businessRegNumber || app.details?.kyc?.businessRegNumber || undefined,
             }
+<<<<<<< Updated upstream
           });
           // Persist this to festivo_pending_vendors so it stays
           safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
@@ -224,58 +155,65 @@ export default function AdminDashboard() {
                 }
               }
             };
+=======
+>>>>>>> Stashed changes
           }
-          return app;
-        });
-
-        if (!found) {
-          pendingList.unshift({
-            id: vUser?.id || fu?.id || `VND-${Date.now()}`,
-            name: activeName,
-            category: vUser?.category || 'Event Provider',
-            location: vUser?.location || 'Hyderabad, India',
-            price_amount: 35000,
-            price_label: 'Starting Package',
-            price_unit: 'event',
-            rating: 5.0,
-            reviews: 0,
-            image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-            logo: (activeName[0] || 'V').toUpperCase(),
-            verified: isApproved,
-            badge: isApproved ? 'Approved' : (kRecord ? 'KYC Submitted' : 'Pending Review'),
-            badge_color: isApproved ? 'bg-sage-600' : 'bg-gold-500',
-            slug: vUser?.username || activeEmail.split('@')[0],
-            details: {
-              email: activeEmail,
-              phone: vUser?.phone || fp?.phone || '+91 98765 43210',
-              owner: activeOwner,
-              address: vUser?.location || 'Hyderabad, India',
-              registrationDate: new Date().toISOString().split('T')[0],
-              status: isApproved ? 'Approved' : (kRecord ? 'KYC Submitted' : 'Pending Verification'),
-              kyc: {
-                idNumber: kRecord?.govtIdNumber || 'Not submitted',
-                aadhaarFront: kRecord?.govtIdFile || '',
-                cancelledCheque: kRecord?.bankProofFile || '',
-                businessRegFile: kRecord?.businessRegFile || undefined,
-                businessRegNumber: kRecord?.businessRegNumber || undefined,
-              }
-            }
-          });
-        }
-      }
+        };
+      });
     } catch (e) {}
 
-    // Deduplicate by email and id
+    // Deduplicate by email/id
     const seen = new Set();
     pendingList = pendingList.filter((app: any) => {
-      const key = (app.details?.email || app.id || app.name).toLowerCase().trim();
-      if (seen.has(key)) return false;
+      const key = (app.details?.email || app.id || app.name || '').toLowerCase().trim();
+      if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
     });
 
+<<<<<<< Updated upstream
     safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
+=======
+>>>>>>> Stashed changes
     setPendingApplications(pendingList);
+  };
+
+  const handleClearAllApplications = () => {
+    localStorage.removeItem('festivo_pending_vendors');
+    localStorage.removeItem('festivo_custom_vendors');
+    localStorage.removeItem('festivo_registered_vendors');
+    localStorage.removeItem('vendor_kyc_record');
+    localStorage.removeItem('vendor_kyc_status');
+
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('vendor_kyc_record_') || k.startsWith('festivo_kyc_status_'))) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+
+    setPendingApplications([]);
+    window.dispatchEvent(new Event('storage'));
+    try {
+      const channel = new BroadcastChannel('festivo_auth_channel');
+      channel.postMessage({ type: 'APPLICATIONS_CLEARED' });
+      channel.close();
+    } catch (e) {}
+  };
+
+  const handleDeleteApplication = (appId: string) => {
+    const app = pendingApplications.find(a => a.id === appId);
+    const email = (app?.details?.email || '').toLowerCase().trim();
+    if (email) {
+      localStorage.removeItem(`vendor_kyc_record_${email}`);
+      localStorage.removeItem(`festivo_kyc_status_${email}`);
+    }
+    const updated = pendingApplications.filter(a => a.id !== appId);
+    localStorage.setItem('festivo_pending_vendors', JSON.stringify(updated));
+    setPendingApplications(updated);
+    window.dispatchEvent(new Event('storage'));
   };
 
   useEffect(() => {
@@ -565,7 +503,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex gap-1 mt-6 overflow-x-auto">
-              {(['overview', 'applications', 'vendors', 'bookings', 'revenue'] as const).map(tab => (
+              {(['overview', 'applications', 'vendors', 'bookings'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -584,7 +522,7 @@ export default function AdminDashboard() {
           {/* Applications Review Tab */}
           {activeTab === 'applications' && (
             <div className="bg-white rounded-2xl shadow-card p-6 space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="font-display text-2xl font-bold text-sage-900 flex items-center gap-2">
                     <Shield className="w-6 h-6 text-sage-600" /> Vendor Applications & KYC Inspection
@@ -593,16 +531,32 @@ export default function AdminDashboard() {
                     Review submitted vendor identity documents (Aadhaar/PAN/Cheque) and click Accept to unlock their Vendor Dashboard.
                   </p>
                 </div>
-                <span className="bg-gold-100 text-gold-800 text-xs font-extrabold px-3 py-1.5 rounded-full border border-gold-300">
-                  {pendingApplications.filter(a => !a.verified).length} Pending Review
-                </span>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="bg-gold-100 text-gold-800 text-xs font-extrabold px-3 py-1.5 rounded-full border border-gold-300">
+                    {pendingApplications.filter(a => !a.verified).length} Pending Review
+                  </span>
+                  {pendingApplications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to delete and clear ALL applications?')) {
+                          handleClearAllApplications();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl border border-red-200 transition-colors cursor-pointer shadow-xs"
+                      title="Wipe all application history"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Clear All
+                    </button>
+                  )}
+                </div>
               </div>
 
               {pendingApplications.length === 0 ? (
                 <div className="text-center py-12 bg-cream-50/50 rounded-2xl border border-dashed border-sage-200">
                   <CheckCircle2 className="w-12 h-12 text-sage-500 mx-auto mb-3" />
-                  <p className="font-bold text-sage-900 text-base">No pending applications</p>
-                  <p className="text-dark-500 text-sm">All submitted vendor applications have been reviewed.</p>
+                  <p className="font-bold text-sage-900 text-base">No applications found</p>
+                  <p className="text-dark-500 text-sm">Applications list is empty. When new vendors submit KYC documents, they will appear here.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -627,8 +581,8 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        {/* Accept & Reject Action Buttons */}
-                        <div className="flex items-center gap-2">
+                        {/* Accept, Reject, and Delete Action Buttons */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           {app.verified || app.details?.status === 'Approved' ? (
                             <div className="flex items-center gap-2">
                               <span className="flex items-center gap-1.5 px-4 py-2 bg-sage-100 text-sage-800 border border-sage-300 font-extrabold text-xs rounded-xl shadow-xs">
@@ -670,8 +624,18 @@ export default function AdminDashboard() {
                               </button>
                             </div>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteApplication(app.id)}
+                            className="p-2 text-dark-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                            title="Delete this application"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
+
 
                       {/* Submitted Documents Inspection */}
                       <div>
@@ -752,10 +716,10 @@ export default function AdminDashboard() {
             <>
               <div ref={statsView.ref} className={`grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-on-scroll ${statsView.inView ? 'in-view' : ''}`}>
                 {[
-                  { label: 'Total Revenue', value: `₹${(totalRevenue / 100000).toFixed(1)}L`, icon: DollarSign, color: 'bg-sage-50 text-sage-600' },
-                  { label: 'Commission Earned', value: `₹${(commissionRevenue / 1000).toFixed(0)}K`, icon: Wallet, color: 'bg-cream-100 text-cream-800' },
                   { label: 'Total Vendors', value: String(vendors.length), icon: Store, color: 'bg-sage-100 text-sage-700' },
                   { label: 'Total Bookings', value: String(bookings.length), icon: BarChart3, color: 'bg-cream-50 text-cream-900' },
+                  { label: 'Confirmed Bookings', value: String(confirmedBookings), icon: CheckCircle2, color: 'bg-sage-50 text-sage-600' },
+                  { label: 'Pending Bookings', value: String(pendingBookings), icon: Clock, color: 'bg-gold-100 text-gold-800' },
                 ].map(stat => (
                   <div key={stat.label} className="bg-white rounded-2xl shadow-card p-5 card-hover">
                     <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center mb-3`}>
@@ -981,61 +945,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Revenue */}
-          {activeTab === 'revenue' && (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[
-                  { label: 'Gross Revenue', value: `₹${(totalRevenue / 100000).toFixed(1)}L`, icon: DollarSign, color: 'bg-sage-50 text-sage-600' },
-                  { label: 'Commission (15%)', value: `₹${(commissionRevenue / 1000).toFixed(0)}K`, icon: Wallet, color: 'bg-cream-100 text-cream-800' },
-                  { label: 'Pending Payouts', value: `₹${((totalRevenue - commissionRevenue) / 1000).toFixed(0)}K`, icon: Clock, color: 'bg-sage-100 text-sage-700' },
-                  { label: 'Avg Order Value', value: `₹${bookings.length ? Math.round(totalRevenue / bookings.length / 1000) : 0}K`, icon: TrendingUp, color: 'bg-cream-50 text-cream-900' },
-                ].map(stat => (
-                  <div key={stat.label} className="bg-white rounded-2xl shadow-card p-5 card-hover">
-                    <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center mb-3`}>
-                      <stat.icon className="w-5 h-5" />
-                    </div>
-                    <p className="font-display text-2xl font-bold text-sage-900">{stat.value}</p>
-                    <p className="text-dark-500 text-sm mt-0.5">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-card p-6">
-                <h2 className="font-display text-xl font-bold text-sage-900 mb-6 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-sage-500" /> Revenue by Category
-                </h2>
-                <div className="space-y-4">
-                  {['Venue', 'Catering', 'Photography', 'Decoration', 'Entertainment', 'Coordinator'].map(cat => {
-                    const catBookings = bookings.filter(b => {
-                      const vendor = vendors.find(v => v.id === b.vendor_id);
-                      return vendor?.category === cat;
-                    });
-                    const catRevenue = catBookings.filter(b => b.payment_status === 'paid').reduce((s, b) => s + b.total_amount, 0);
-                    const maxRevenue = Math.max(...['Venue', 'Catering', 'Photography', 'Decoration', 'Entertainment', 'Coordinator'].map(c => {
-                      const cb = bookings.filter(b => {
-                        const v = vendors.find(vd => vd.id === b.vendor_id);
-                        return v?.category === c;
-                      });
-                      return cb.filter(b => b.payment_status === 'paid').reduce((s, b) => s + b.total_amount, 0);
-                    }), 1);
-                    const pct = (catRevenue / maxRevenue) * 100;
-                    return (
-                      <div key={cat}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-bold text-sage-900 text-sm">{cat}</span>
-                          <span className="font-bold text-sage-600 text-sm">₹{catRevenue.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="h-3 bg-sage-50 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-brand rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
+          {/* End of tabs */}
         </div>
       </div>
 

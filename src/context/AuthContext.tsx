@@ -537,11 +537,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       supabase.auth.signOut();
     }
     setIsAuthenticated(false);
+    setUser(DEFAULT_USER);
     localStorage.removeItem('vendor_is_authenticated');
     localStorage.removeItem('vendor_user_profile');
     localStorage.removeItem('festivo_user');
     localStorage.removeItem('festivo_profile');
+    localStorage.removeItem('vendor_kyc_record');
+    localStorage.removeItem('vendor_kyc_status');
+    window.dispatchEvent(new Event('storage'));
+    try {
+      const channel = new BroadcastChannel('festivo_auth_channel');
+      channel.postMessage({ type: 'AUTH_STATE_CHANGED', user: null });
+      channel.close();
+    } catch (e) {}
   };
+
 
   const updateProfile = (data: Partial<UserProfile>) => {
     setUser(prev => ({ ...prev, ...data }));
