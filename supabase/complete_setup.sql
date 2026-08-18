@@ -104,8 +104,27 @@ CREATE POLICY "select_own_profile" ON profiles FOR SELECT TO authenticated USING
 DROP POLICY IF EXISTS "insert_own_profile" ON profiles;
 CREATE POLICY "insert_own_profile" ON profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
 
-DROP POLICY IF EXISTS "update_own_profile" ON profiles;
-CREATE POLICY "update_own_profile" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+-- 2.5 SEPARATE ADMINS TABLE
+CREATE TABLE IF NOT EXISTS admins (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid UNIQUE,
+  email text UNIQUE NOT NULL,
+  full_name text NOT NULL DEFAULT 'Festivo Admin',
+  role text NOT NULL DEFAULT 'superadmin',
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "public_read_admins" ON admins;
+CREATE POLICY "public_read_admins" ON admins FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "public_insert_admins" ON admins;
+CREATE POLICY "public_insert_admins" ON admins FOR INSERT TO anon, authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "public_update_admins" ON admins;
+CREATE POLICY "public_update_admins" ON admins FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+
+INSERT INTO admins (email, full_name, role)
+VALUES ('admin@festivo.com', 'Festivo Platform Admin', 'superadmin')
+ON CONFLICT (email) DO NOTHING;
 
 -- 3. PHASE 2 TABLES (REVIEWS, NOTIFICATIONS, VENDOR PROFILES, SERVICES, COMMISSIONS)
 CREATE TABLE IF NOT EXISTS reviews (

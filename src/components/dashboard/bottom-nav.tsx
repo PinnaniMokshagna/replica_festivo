@@ -5,8 +5,6 @@ import { cn } from '@/lib/utils';
 const items = [
   { label: 'Dashboard', path: '/vendor-dashboard', icon: Home },
   { label: 'Bookings', path: '/vendor-dashboard/bookings', icon: CalendarCheck },
-  { label: 'Messages', path: '/vendor-dashboard/messages', icon: MessageSquare },
-  { label: 'Earnings', path: '/vendor-dashboard/earnings', icon: Wallet },
   { label: 'Profile', path: '/vendor-dashboard/settings', icon: User },
 ];
 

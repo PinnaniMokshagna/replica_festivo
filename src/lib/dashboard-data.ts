@@ -85,13 +85,9 @@ export const navItems: NavItem[] = [
   { label: 'Verify Documents', icon: 'ShieldCheck' },
   { label: 'Bookings', icon: 'CalendarCheck' },
   { label: 'Calendar', icon: 'CalendarDays' },
-  { label: 'Messages', icon: 'MessageSquare' },
   { label: 'Portfolio', icon: 'Images' },
   { label: 'Packages', icon: 'Package' },
   { label: 'Reviews', icon: 'Star' },
-  { label: 'Earnings', icon: 'Wallet' },
-  { label: 'Analytics', icon: 'BarChart3' },
-  { label: 'Deals', icon: 'Tag' },
   { label: 'Settings', icon: 'Settings' },
   { label: 'Support', icon: 'LifeBuoy' },
 ];

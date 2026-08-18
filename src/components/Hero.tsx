@@ -156,19 +156,7 @@ export default function Hero() {
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-500 pointer-events-none" />
             </div>
 
-            <div className="hidden md:block w-px bg-sage-200 my-2" />
 
-            <div className="flex-1 relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sage-600">
-                <Calendar className="w-4 h-4" />
-              </div>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full pl-10 pr-4 py-4 text-sage-900 bg-transparent rounded-xl focus:bg-sage-50 transition-colors outline-none text-sm font-bold search-input"
-              />
-            </div>
 
             <button
               onClick={handleSearch}
