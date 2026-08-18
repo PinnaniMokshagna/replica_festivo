@@ -6,6 +6,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { safeSetItem } from '../lib/storageUtils';
 import { ALL_CATEGORIES } from '../lib/categories';
 
 const CATEGORIES_LIST = ALL_CATEGORIES;
@@ -279,7 +280,7 @@ export default function VendorRegistrationPage() {
     try {
       // 1. Save in local storage Verification queue
       const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
-      localStorage.setItem('festivo_pending_vendors', JSON.stringify([...pendingList, newVendor]));
+      safeSetItem('festivo_pending_vendors', JSON.stringify([...pendingList, newVendor]));
 
       // Create admin notification
       const adminNotifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
@@ -292,7 +293,7 @@ export default function VendorRegistrationPage() {
         timestamp: new Date().toISOString(),
         read: false
       };
-      localStorage.setItem('festivo_admin_notifications', JSON.stringify([newAdminNotification, ...adminNotifications]));
+      safeSetItem('festivo_admin_notifications', JSON.stringify([newAdminNotification, ...adminNotifications]));
 
       // 2. Submit to Supabase database
       let createdVendorId: string | null = null;

@@ -128,6 +128,7 @@ export default function VendorsPage() {
   const { ref: gridRef, inView: gridInView } = useInView<HTMLDivElement>(0);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     const category = searchParams.get('category');
     const occasion = searchParams.get('occasion');
     if (category) {

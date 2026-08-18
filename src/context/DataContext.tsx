@@ -13,6 +13,7 @@ import {
   type Package,
   type Review,
 } from '@/lib/dashboard-data';
+import { safeSetItem } from '@/lib/storageUtils';
 
 export interface ExtendedBooking {
   id: string;
@@ -454,17 +455,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    localStorage.setItem('vendor_packages', JSON.stringify(packagesList));
-
     const activeUserRaw = localStorage.getItem('vendor_user_profile');
     if (activeUserRaw) {
       try {
         const u = JSON.parse(activeUserRaw);
         const uEmail = (u.email || '').toLowerCase().trim();
         const uName = (u.businessName || u.fullName || '').toLowerCase().trim();
+        const uSlug = (u.username || u.slug || '').toLowerCase().trim();
 
-        // Only sync if we have a real email or name to match against (prevent updating all vendors)
-        if (!uEmail && !uName) return;
+        if (uEmail) safeSetItem(`vendor_packages_${uEmail}`, JSON.stringify(packagesList));
+        if (uSlug) safeSetItem(`vendor_packages_${uSlug}`, JSON.stringify(packagesList));
+        if (u.id) safeSetItem(`vendor_packages_${u.id}`, JSON.stringify(packagesList));
+
+        // Only sync if we have a real email, name, or slug to match against
+        if (!uEmail && !uName && !uSlug) return;
 
         const syncVendorList = (listKey: string) => {
           const raw = localStorage.getItem(listKey);
@@ -474,20 +478,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           const updated = list.map((v: any) => {
             const vEmail = (v.details?.email || v.email || '').toLowerCase().trim();
             const vName = (v.name || '').toLowerCase().trim();
-            const isMatch = (uEmail && vEmail === uEmail) || (uName && vName === uName);
+            const vSlug = (v.slug || '').toLowerCase().trim();
+            const isMatch = (uEmail && vEmail === uEmail) || (uName && vName === uName) || (uSlug && vSlug === uSlug);
             if (isMatch) {
               changed = true;
               return { ...v, custom_packages: packagesList };
             }
             return v;
           });
-          if (changed) localStorage.setItem(listKey, JSON.stringify(updated));
+          if (changed) safeSetItem(listKey, JSON.stringify(updated));
         };
 
         syncVendorList('festivo_approved_vendors');
         syncVendorList('festivo_pending_vendors');
         syncVendorList('festivo_custom_vendors');
       } catch (e) {}
+    } else {
+      safeSetItem('vendor_packages', JSON.stringify(packagesList));
     }
     window.dispatchEvent(new Event('storage'));
   }, [packagesList]);

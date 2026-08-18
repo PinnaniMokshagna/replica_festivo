@@ -569,10 +569,18 @@ export default function VendorDetailPage() {
                       activeVendorPackages = (vendor as any).custom_packages;
                     } else {
                       try {
-                        const savedPkgs = localStorage.getItem('vendor_packages');
-                        if (savedPkgs) {
-                          const parsed = JSON.parse(savedPkgs);
-                          if (parsed.length > 0) {
+                        const vId = vendor.id || '';
+                        const vSlug = vendor.slug || '';
+                        const vEmail = ((vendor as any).details?.email || '').toLowerCase().trim();
+
+                        const pkgsById = vId ? localStorage.getItem(`vendor_packages_${vId}`) : null;
+                        const pkgsBySlug = vSlug ? localStorage.getItem(`vendor_packages_${vSlug}`) : null;
+                        const pkgsByEmail = vEmail ? localStorage.getItem(`vendor_packages_${vEmail}`) : null;
+
+                        const raw = pkgsById || pkgsBySlug || pkgsByEmail;
+                        if (raw) {
+                          const parsed = JSON.parse(raw);
+                          if (Array.isArray(parsed) && parsed.length > 0) {
                             activeVendorPackages = parsed.filter((pkg: any) => pkg && !['1', '2', '3'].includes(String(pkg.id)));
                           }
                         }

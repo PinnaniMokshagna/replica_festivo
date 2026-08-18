@@ -56,7 +56,16 @@ export interface Review {
 
 export interface Package {
   id: string;
+  vendorId?: string;
+  vendorEmail?: string;
+  vendorSlug?: string;
   name: string;
+  category?: string;
+  packageType?: 'Basic' | 'Standard' | 'Premium' | 'Custom';
+  shortDescription?: string;
+  detailedDescription?: string;
+  coverImage?: string;
+  galleryImages?: string[];
   price: string;
   services: string[];
   popular?: boolean;

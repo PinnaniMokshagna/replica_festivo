@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth, type UserRole } from '../lib/auth';
 import { ALL_CATEGORIES } from '../lib/categories';
+import { safeSetItem } from '../lib/storageUtils';
 
 /* ── Data ───────────────────────────────────────────────────────── */
 
@@ -53,18 +54,18 @@ const ADMIN_FEATURES = [
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp, signOut, user, profile, setDemoAdmin } = useAuth();
 
-  const [searchParams] = useSearchParams();
   const getInitialRole = (): UserRole | null => {
-    if (searchParams.get('admin') === 'true') return null;
+    if (searchParams.get('admin') === 'true' || searchParams.get('role') === 'admin') return 'admin';
     return (searchParams.get('role') as UserRole) || 'customer';
   };
   const [role, setRole] = useState<UserRole | null>(getInitialRole());
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => (getInitialRole() === 'admin' ? 'admin@festivo.com' : ''));
+  const [password, setPassword] = useState(() => (getInitialRole() === 'admin' ? 'admin123' : ''));
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -238,7 +239,7 @@ export default function AuthPage() {
               },
             };
             pendingList.unshift(newPendingEntry);
-            localStorage.setItem('festivo_pending_vendors', JSON.stringify(pendingList));
+            safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
 
             // Notify admin
             const notifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
@@ -251,7 +252,7 @@ export default function AuthPage() {
               timestamp: new Date().toISOString(),
               read: false,
             });
-            localStorage.setItem('festivo_admin_notifications', JSON.stringify(notifications));
+            safeSetItem('festivo_admin_notifications', JSON.stringify(notifications));
             window.dispatchEvent(new Event('storage'));
           }
         } catch (e) {
@@ -276,10 +277,13 @@ export default function AuthPage() {
           setError(error);
           return;
         }
-        // After sign-up: Require explicit sign-in before opening dashboard
-        setMode('signin');
-        setSuccessMsg('Account created successfully! Please sign in with your credentials to access your Vendor Dashboard.');
-        setError('');
+        if (role === 'customer') {
+          navigate('/dashboard');
+        } else {
+          setMode('signin');
+          setSuccessMsg('Vendor Account created successfully! Please sign in with your credentials to access your Vendor Dashboard.');
+          setError('');
+        }
       }
     } catch (err) {
       setLoading(false);

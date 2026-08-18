@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase-client';
+import { safeSetItem } from '@/lib/storageUtils';
 
 export type KycStatus = 'unverified' | 'pending' | 'verified';
 
@@ -491,7 +492,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         };
         pendingList.unshift(newEntry);
-        localStorage.setItem('festivo_pending_vendors', JSON.stringify(pendingList));
+        safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
 
         // Notify admin
         const notifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
@@ -623,10 +624,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       localPending.unshift(pendingVendor);
     }
-    localStorage.setItem('festivo_pending_vendors', JSON.stringify(localPending));
+    safeSetItem('festivo_pending_vendors', JSON.stringify(localPending));
 
     // Also sync the specific flag read by tab 3 of AdminDashboard
-    localStorage.setItem(`festivo_kyc_status_${user.email.toLowerCase()}`, 'Pending Verification');
+    safeSetItem(`festivo_kyc_status_${user.email.toLowerCase()}`, 'Pending Verification');
 
     const vendorName = existingIndex > -1 ? localPending[existingIndex].name : user.businessName;
     const vendorCategory = existingIndex > -1 ? localPending[existingIndex].category : (user.category || 'Photographer');

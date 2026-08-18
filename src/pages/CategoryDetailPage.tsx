@@ -32,6 +32,7 @@ export default function CategoryDetailPage() {
   }, [categoryParam]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     const isCategoryMatch = (vCategory: string, catLabel: string) => {
       if (!vCategory || !catLabel) return false;
       const v = (vCategory || '').toLowerCase().trim();

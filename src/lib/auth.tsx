@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { safeSetItem } from './storageUtils';
 
-export type UserRole = 'customer' | 'vendor';
+export type UserRole = 'customer' | 'vendor' | 'admin';
 
 export type Profile = {
   id: string;
@@ -90,8 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string, role?: 'vendor' | 'customer') => {
+    const emailLower = (email || '').trim().toLowerCase();
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email: emailLower, password });
       if (!error) return { error: null };
     } catch (e) {
       console.warn('Supabase auth network error, fallback to demo mode:', e);
@@ -109,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
 
     // Extract dynamic name from email as fallback
-    const emailPrefix = emailLower.split('@')[0];
+    const emailPrefix = emailLower.split('@')[0] || 'user';
     const formattedName = emailPrefix
       .replace(/[._\-]/g, ' ')
       .split(' ')
@@ -117,10 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ') || 'User';
 
-    // Determine if this login is a vendor — trust the role param first, then heuristics
-    const isVendor = role === 'vendor' || !!(registeredVendorData) || email.includes('vendor');
+    // Determine if this login is a vendor — trust the requested role first, then heuristics if unspecified
+    const isVendor = role ? (role === 'vendor') : (!!registeredVendorData || emailLower.includes('vendor'));
 
-    const finalName = registeredVendorData
+    const finalName = (isVendor && registeredVendorData)
       ? (registeredVendorData.details?.owner || registeredVendorData.name || formattedName)
       : formattedName;
 
@@ -133,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const slug = registeredVendorData?.slug || emailPrefix.replace(/[^a-z0-9]/gi, '-').toLowerCase();
 
     const mockUser: User = {
-      id: vendorId,
+      id: isVendor ? vendorId : `usr_${Date.now()}`,
       email,
       app_metadata: {},
       user_metadata: { full_name: finalName },
@@ -166,8 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone: registeredVendorData?.details?.phone || (isSameUser ? existingVendorProfile?.phone : '') || '',
         username: slug,
       };
-      localStorage.setItem('vendor_user_profile', JSON.stringify(mergedVendorProfile));
-      localStorage.setItem('vendor_is_authenticated', 'true');
+      safeSetItem('vendor_user_profile', JSON.stringify(mergedVendorProfile));
+      safeSetItem('vendor_is_authenticated', 'true');
 
       // Always upsert into festivo_pending_vendors so Admin can see this vendor
       try {
@@ -207,7 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
           };
           pendingList.unshift(newEntry);
-          localStorage.setItem('festivo_pending_vendors', JSON.stringify(pendingList));
+          safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
 
           // Notify admin
           const notifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
@@ -220,7 +222,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             timestamp: new Date().toISOString(),
             read: false,
           });
-          localStorage.setItem('festivo_admin_notifications', JSON.stringify(notifications));
+          safeSetItem('festivo_admin_notifications', JSON.stringify(notifications));
+          window.dispatchEvent(new Event('storage'));
         }
       } catch (e) {
         console.warn('Could not upsert vendor to pending list:', e);

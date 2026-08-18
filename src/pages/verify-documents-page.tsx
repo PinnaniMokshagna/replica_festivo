@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { VerifiedBadge } from '@/components/ui/verified-badge';
+import { safeSetItem, compactFileUrl } from '@/lib/storageUtils';
+import { supabase } from '@/lib/supabase';
 
 // Compress and resize image to fit within localStorage limits
 const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
@@ -135,7 +137,7 @@ export function VerifyDocumentsPage() {
       timestamp: new Date().toISOString(),
       read: false
     };
-    localStorage.setItem('festivo_admin_notifications', JSON.stringify([newAdminNotif, ...adminNotifications]));
+    safeSetItem('festivo_admin_notifications', JSON.stringify([newAdminNotif, ...adminNotifications]));
 
     const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
     const userEmailLower = (user?.email || '').toLowerCase().trim();
@@ -172,9 +174,9 @@ export function VerifyDocumentsPage() {
         status: 'Pending Verification',
         kyc: {
           idNumber: finalIdNumber,
-          aadhaarFront: finalGovtIdFile,
-          cancelledCheque: finalBankProofFile,
-          businessRegFile: businessRegFile || undefined,
+          aadhaarFront: compactFileUrl(finalGovtIdFile, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'),
+          cancelledCheque: compactFileUrl(finalBankProofFile, 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800'),
+          businessRegFile: compactFileUrl(businessRegFile, 'uploaded_document.pdf'),
           businessRegNumber: businessRegNumber || undefined,
         }
       }
@@ -198,25 +200,37 @@ export function VerifyDocumentsPage() {
       pendingList.unshift(kycVendorRecord);
     }
 
-    localStorage.setItem('festivo_pending_vendors', JSON.stringify(pendingList));
-    localStorage.setItem('vendor_kyc_status', 'pending');
-    localStorage.setItem('vendor_kyc_record', JSON.stringify({
+    safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
+    safeSetItem('vendor_kyc_status', 'pending');
+    safeSetItem('vendor_kyc_record', JSON.stringify({
       govtIdType,
       govtIdNumber: finalIdNumber,
-      govtIdFile: finalGovtIdFile,
+      govtIdFile: compactFileUrl(finalGovtIdFile, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'),
       businessRegNumber,
-      businessRegFile,
-      bankProofFile: finalBankProofFile,
+      businessRegFile: compactFileUrl(businessRegFile, 'uploaded_document.pdf'),
+      bankProofFile: compactFileUrl(finalBankProofFile, 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800'),
       submittedAt: new Date().toLocaleDateString('en-IN')
     }));
 
     if (user?.email) {
-      localStorage.setItem(`festivo_kyc_status_${user.email.toLowerCase().trim()}`, 'Pending Verification');
+      safeSetItem(`festivo_kyc_status_${user.email.toLowerCase().trim()}`, 'Pending Verification');
+    }
+
+    // Direct Supabase DB sync for vendor profile & KYC submission
+    if (user?.id) {
+      supabase.from('vendor_profiles').upsert({
+        user_id: user.id,
+        business_name: bName,
+        approval_status: 'pending',
+        documents_uploaded: true,
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase vendor_profiles sync notice:', error.message);
+      });
     }
 
     // Also update vendor_user_profile with updated studio name and business details
     const activeProfile = JSON.parse(localStorage.getItem('vendor_user_profile') || '{}');
-    localStorage.setItem('vendor_user_profile', JSON.stringify({
+    safeSetItem('vendor_user_profile', JSON.stringify({
       ...activeProfile,
       fullName: vendorName,
       businessName: bName,

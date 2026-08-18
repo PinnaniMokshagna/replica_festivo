@@ -35,12 +35,15 @@ import { SettingsPage } from './pages/settings-page';
 import { SupportPage } from './pages/support-page';
 import { NotificationsPage } from './pages/notifications-page';
 
+import ScrollToTop from './components/ScrollToTop';
+
 export default function App() {
   return (
     <MainAuthProvider>
       <DashboardAuthProvider>
         <DataProvider>
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               {/* Public Website Routes */}
               <Route path="/" element={<HomePage />} />
