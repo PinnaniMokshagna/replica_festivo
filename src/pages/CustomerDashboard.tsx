@@ -122,15 +122,17 @@ export default function CustomerDashboard() {
         console.warn('Could not fetch DB bookings:', e);
       }
 
-      // 2. Fetch local storage bookings matching user's email
+      // 2. Fetch local storage bookings matching user's email (excluding sample demo receipts unless email matches)
       const savedCustomerBookings = localStorage.getItem('festivo_customer_bookings');
       if (savedCustomerBookings) {
         try {
           const parsed = JSON.parse(savedCustomerBookings);
           if (Array.isArray(parsed)) {
-            const userLocal = parsed.filter((b: any) =>
-              (b.customer_email || '').trim().toLowerCase() === userEmail
-            );
+            const userLocal = parsed.filter((b: any) => {
+              const emailMatch = (b.customer_email || '').trim().toLowerCase() === userEmail;
+              const isSampleDemo = b.customer_email === 'kranti@festivo.com' || (b.id && String(b.id).startsWith('rec-'));
+              return emailMatch && (!isSampleDemo || userEmail === 'kranti@festivo.com');
+            });
             userLocal.forEach((b: any) => {
               if (!userBookings.some(existing => existing.id === b.id || existing.booking_ref === b.booking_ref)) {
                 userBookings.push(b);
