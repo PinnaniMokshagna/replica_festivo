@@ -426,7 +426,9 @@ export default function AdminDashboard() {
                     <span className="bg-gold-500 text-sage-900 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                       <Shield className="w-3 h-3" /> Administrator
                     </span>
-                    <span className="text-sage-200 text-sm">{user?.email}</span>
+                    <span className="text-sage-200 text-sm">
+                      {isAdminAuth ? 'admin@festivo.com' : (user?.email || 'admin@festivo.com')}
+                    </span>
                   </div>
                 </div>
               </div>
