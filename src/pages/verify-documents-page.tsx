@@ -269,23 +269,6 @@ export function VerifyDocumentsPage() {
     }
   };
 
-      try {
-        const channel = new BroadcastChannel('festivo_auth_channel');
-        channel.postMessage({ type: 'KYC_STATUS_CHANGED', status: 'pending', email: userEmailLower });
-        channel.close();
-      } catch (e) {}
-
-      window.dispatchEvent(new Event('storage'));
-
-      showToast('KYC Application Submitted Successfully! Application status is now Pending Review. Admin notified.');
-
-    } catch (err: any) {
-      console.error('KYC submit error:', err);
-      setSubmitError(err?.message || 'Failed to save documents. Try uploading smaller files.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="space-y-6">

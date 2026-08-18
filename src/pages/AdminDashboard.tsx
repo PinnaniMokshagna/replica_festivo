@@ -102,61 +102,6 @@ export default function AdminDashboard() {
               businessRegFile: kRec?.businessRegFile || app.details?.kyc?.businessRegFile || undefined,
               businessRegNumber: kRec?.businessRegNumber || app.details?.kyc?.businessRegNumber || undefined,
             }
-<<<<<<< Updated upstream
-          });
-          // Persist this to festivo_pending_vendors so it stays
-          safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
-          window.dispatchEvent(new Event('storage'));
-        }
-      }
-    } catch (e) {}
-
-    // ── Source 6: Attach submitted vendor_kyc_record & documents to the matching vendor ──
-    try {
-      const vUser = (() => { try { return JSON.parse(localStorage.getItem('vendor_user_profile') || 'null'); } catch { return null; } })();
-      const fu = (() => { try { return JSON.parse(localStorage.getItem('festivo_user') || 'null'); } catch { return null; } })();
-      const fp = (() => { try { return JSON.parse(localStorage.getItem('festivo_profile') || 'null'); } catch { return null; } })();
-      const kRecord = (() => { try { return JSON.parse(localStorage.getItem('vendor_kyc_record') || 'null'); } catch { return null; } })();
-
-      const activeEmail = (vUser?.email || fu?.email || '').toLowerCase().trim();
-      const activeName = vUser?.businessName || (fp?.full_name ? (fp.full_name.includes('Events') || fp.full_name.includes('Studio') ? fp.full_name : `${fp.full_name} Events`) : '') || (fu?.user_metadata?.full_name ? `${fu.user_metadata.full_name} Events` : '') || 'Vendor Partner Events';
-      const activeOwner = vUser?.fullName || fp?.full_name || fu?.user_metadata?.full_name || 'Vendor Partner';
-
-      if (activeEmail) {
-        const kycStatusKey = localStorage.getItem(`festivo_kyc_status_${activeEmail}`);
-        const isApproved = kycStatusKey === 'Approved';
-
-        let found = false;
-        pendingList = pendingList.map((app: any) => {
-          const appEmail = (app.details?.email || '').toLowerCase().trim();
-          const appName = (app.name || '').toLowerCase().trim();
-          if (appEmail === activeEmail || (vUser?.id && app.id === vUser.id) || (appName && appName === activeName.toLowerCase().trim())) {
-            found = true;
-            return {
-              ...app,
-              name: app.name || activeName,
-              verified: isApproved,
-              badge: isApproved ? 'Approved' : (kRecord ? 'KYC Submitted' : (app.badge || 'Pending Review')),
-              badge_color: isApproved ? 'bg-sage-600' : 'bg-gold-500',
-              details: {
-                ...app.details,
-                owner: app.details?.owner || activeOwner,
-                email: activeEmail,
-                phone: vUser?.phone || fp?.phone || app.details?.phone || '+91 98765 43210',
-                address: vUser?.location || fp?.city || app.details?.address || 'Hyderabad, India',
-                status: isApproved ? 'Approved' : (kRecord ? 'KYC Submitted' : (app.details?.status || 'Pending Verification')),
-                kyc: {
-                  ...app.details?.kyc,
-                  idNumber: kRecord?.govtIdNumber || app.details?.kyc?.idNumber || 'Not submitted',
-                  aadhaarFront: kRecord?.govtIdFile || app.details?.kyc?.aadhaarFront || '',
-                  cancelledCheque: kRecord?.bankProofFile || app.details?.kyc?.cancelledCheque || '',
-                  businessRegFile: kRecord?.businessRegFile || app.details?.kyc?.businessRegFile || undefined,
-                  businessRegNumber: kRecord?.businessRegNumber || app.details?.kyc?.businessRegNumber || undefined,
-                }
-              }
-            };
-=======
->>>>>>> Stashed changes
           }
         };
       });
@@ -171,12 +116,9 @@ export default function AdminDashboard() {
       return true;
     });
 
-<<<<<<< Updated upstream
-    safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
-=======
->>>>>>> Stashed changes
     setPendingApplications(pendingList);
   };
+
 
   const handleClearAllApplications = () => {
     localStorage.removeItem('festivo_pending_vendors');
