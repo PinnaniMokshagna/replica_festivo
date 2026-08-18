@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head><title>Festivo Vendor-Admin Test</title>
+<style>
+body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+.pass { color: #00ff88; font-weight: bold; }
+.fail { color: #ff4444; font-weight: bold; }
+.info { color: #88ccff; }
+pre { background: #16213e; padding: 12px; border-radius: 8px; overflow-x: auto; }
+button { padding: 12px 24px; background: #0f3460; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 8px; }
+button:hover { background: #1a5276; }
+h2 { color: #e94560; }
+</style>
+</head>
+<body>
+<h2>Festivo Vendor → Admin Connectivity Test</h2>
+<p class="info">This page directly tests localStorage to verify the vendor-admin data pipeline.</p>
+
+<button onclick="step1()">Step 1: Simulate Vendor kk@mail.com Sign-In</button>
+<button onclick="step2()">Step 2: Check Admin Applications</button>
+<button onclick="clearAll()">Clear All Test Data</button>
+
+<pre id="output">Click Step 1 to begin...</pre>
+
+<script>
+const log = (msg) => { document.getElementById('output').textContent += '\n' + msg; };
+const clear = () => { document.getElementById('output').textContent = ''; };
+
+function step1() {
+  clear();
+  log('═══ STEP 1: Simulating vendor kk@mail.com sign-in ═══');
+  
+  const emailLower = 'kk@mail.com';
+  const emailPrefix = emailLower.split('@')[0];
+  const autoName = emailPrefix.replace(/[._\-]/g, ' ').split(' ').filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Vendor';
+  const businessName = autoName + ' Events';
+  
+  log('Derived name: ' + autoName);
+  log('Business name: ' + businessName);
+  
+  // Set KYC status
+  localStorage.setItem('vendor_kyc_status', 'unverified');
+  localStorage.setItem('festivo_kyc_status_' + emailLower, 'unverified');
+  log('✓ Set KYC status keys');
+  
+  // Write to festivo_pending_vendors
+  let pendingList = [];
+  try { pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]'); } catch(e) {}
+  
+  const alreadyExists = pendingList.some(v => (v.details?.email || '').toLowerCase().trim() === emailLower);
+  log('Already in pending list: ' + alreadyExists);
+  
+  if (!alreadyExists) {
+    const newEntry = {
+      id: 'VND-KK-TEST-001',
+      name: businessName,
+      category: 'Event Provider',
+      location: 'Hyderabad, India',
+      price_amount: 25000,
+      price_label: 'Starting Package',
+      price_unit: 'event',
+      rating: 5.0,
+      reviews: 0,
+      image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
+      logo: 'KK',
+      verified: false,
+      badge: 'Pending Review',
+      badge_color: 'bg-gold-500',
+      slug: 'kk',
+      details: {
+        email: emailLower,
+        phone: '',
+        owner: autoName,
+        address: 'Hyderabad, India',
+        registrationDate: new Date().toISOString().split('T')[0],
+        status: 'Pending Verification',
+        kyc: { idNumber: 'Not submitted', aadhaarFront: '', cancelledCheque: '' }
+      }
+    };
+    pendingList.unshift(newEntry);
+    localStorage.setItem('festivo_pending_vendors', JSON.stringify(pendingList));
+    log('✓ WROTE kk@mail.com to festivo_pending_vendors');
+  }
+  
+  // Set festivo_user and festivo_profile 
+  const mockUser = { id: 'VND-KK-TEST-001', email: emailLower, user_metadata: { full_name: autoName } };
+  const mockProfile = { id: 'VND-KK-TEST-001', full_name: autoName, role: 'vendor', phone: '', city: 'Hyderabad' };
+  localStorage.setItem('festivo_user', JSON.stringify(mockUser));
+  localStorage.setItem('festivo_profile', JSON.stringify(mockProfile));
+  log('✓ Set festivo_user and festivo_profile');
+  
+  // Set vendor_user_profile
+  const vendorProfile = {
+    id: 'VND-KK-TEST-001',
+    email: emailLower,
+    fullName: autoName,
+    businessName: businessName,
+    category: 'Event Provider',
+    location: 'Hyderabad, India',
+    phone: '',
+    username: 'kk',
+  };
+  localStorage.setItem('vendor_user_profile', JSON.stringify(vendorProfile));
+  log('✓ Set vendor_user_profile');
+  
+  window.dispatchEvent(new Event('storage'));
+  log('✓ Dispatched storage event');
+  
+  log('\n═══ VERIFICATION ═══');
+  step2();
+}
+
+function step2() {
+  log('\n═══ STEP 2: Checking what Admin Dashboard would see ═══');
+  
+  // Read festivo_pending_vendors
+  let pendingList = [];
+  try { pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]'); } catch(e) {}
+  log('festivo_pending_vendors count: ' + pendingList.length);
+  
+  if (pendingList.length === 0) {
+    log('✗ FAIL: No vendors in pending list!');
+  } else {
+    pendingList.forEach((v, i) => {
+      const email = v.details?.email || 'NO EMAIL';
+      const status = v.details?.status || v.badge || 'unknown';
+      log('  [' + i + '] ' + v.name + ' | ' + email + ' | ' + status + ' | verified=' + v.verified);
+    });
+    
+    const hasKK = pendingList.some(v => (v.details?.email || '').toLowerCase().includes('kk@mail.com'));
+    if (hasKK) {
+      log('\n✓ PASS: kk@mail.com IS in the pending vendors list!');
+    } else {
+      log('\n✗ FAIL: kk@mail.com NOT found in pending vendors list');
+    }
+  }
+  
+  // Check other keys
+  log('\nOther keys:');
+  log('  vendor_kyc_status: ' + localStorage.getItem('vendor_kyc_status'));
+  log('  festivo_kyc_status_kk@mail.com: ' + localStorage.getItem('festivo_kyc_status_kk@mail.com'));
+  log('  festivo_admin_authenticated: ' + localStorage.getItem('festivo_admin_authenticated'));
+  
+  const vup = localStorage.getItem('vendor_user_profile');
+  if (vup) {
+    try {
+      const parsed = JSON.parse(vup);
+      log('  vendor_user_profile.email: ' + parsed.email);
+      log('  vendor_user_profile.businessName: ' + parsed.businessName);
+    } catch(e) { log('  vendor_user_profile: parse error'); }
+  } else {
+    log('  vendor_user_profile: NULL');
+  }
+  
+  const fu = localStorage.getItem('festivo_user');
+  if (fu) {
+    try { log('  festivo_user.email: ' + JSON.parse(fu).email); } catch(e) {}
+  } else {
+    log('  festivo_user: NULL');
+  }
+  
+  const fp = localStorage.getItem('festivo_profile');
+  if (fp) {
+    try { 
+      const p = JSON.parse(fp);
+      log('  festivo_profile.role: ' + p.role);
+      log('  festivo_profile.full_name: ' + p.full_name);
+    } catch(e) {}
+  } else {
+    log('  festivo_profile: NULL');
+  }
+  
+  log('\n═══ NOW GO TO http://localhost:5173/admin AND CHECK APPLICATIONS TAB ═══');
+}
+
+function clearAll() {
+  clear();
+  localStorage.removeItem('festivo_pending_vendors');
+  localStorage.removeItem('festivo_custom_vendors');
+  localStorage.removeItem('festivo_registered_vendors');
+  localStorage.removeItem('festivo_admin_notifications');
+  localStorage.removeItem('festivo_admin_authenticated');
+  localStorage.removeItem('vendor_user_profile');
+  localStorage.removeItem('vendor_kyc_status');
+  localStorage.removeItem('vendor_kyc_record');
+  localStorage.removeItem('festivo_user');
+  localStorage.removeItem('festivo_profile');
+  localStorage.removeItem('festivo_kyc_status_kk@mail.com');
+  localStorage.removeItem('vendor_is_authenticated');
+  window.dispatchEvent(new Event('storage'));
+  log('✓ All test data cleared. You can now start fresh.');
+}
+</script>
+</body>
+</html>
