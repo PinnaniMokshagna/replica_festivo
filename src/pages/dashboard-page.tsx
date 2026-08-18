@@ -4,7 +4,7 @@ import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { UpcomingEvents } from '@/components/dashboard/upcoming-events';
 import { BookingRequests } from '@/components/dashboard/booking-requests';
 import { AvailabilityCard } from '@/components/dashboard/availability-card';
-import { ProfileCompletion } from '@/components/dashboard/profile-completion';
+
 import { TodaySchedule } from '@/components/dashboard/today-schedule';
 import { PerformanceCard } from '@/components/dashboard/performance-card';
 import { EarningsCard } from '@/components/dashboard/earnings-card';
@@ -41,7 +41,7 @@ export function DashboardPage() {
         {/* Right column 30% */}
         <div className="space-y-6">
           <AvailabilityCard />
-          <ProfileCompletion />
+
           <TodaySchedule />
           <PerformanceCard />
           <NotificationsCard />
