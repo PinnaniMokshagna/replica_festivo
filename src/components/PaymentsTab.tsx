@@ -154,7 +154,7 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
 
   // Financial Calculations
   const totalSpent = bookings.filter(b => b.payment_status === 'paid').reduce((s, b) => s + b.total_amount, 0);
-  const pendingAmount = bookings.filter(b => b.payment_status !== 'paid' && b.status !== 'cancelled').reduce((s, b) => s + b.total_amount, 0);
+  const pendingAmount = bookings.filter(b => b.payment_status !== 'paid' && b.status === 'vendor_accepted').reduce((s, b) => s + b.total_amount, 0);
 
   // Status Badges
   const paymentBadge = (status: string) => {
@@ -189,7 +189,7 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
             .update({ payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId })
             .eq('id', selectedPaymentBooking.id);
 
-          if (!error) {
+          if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
             setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId } : b));
             setPaymentSuccessMessage(`Razorpay Payment (ID: ${razorpayPaymentId}) of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} successful!`);
             setTimeout(() => {
@@ -212,7 +212,7 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
           .update({ payment_status: 'paid', status: 'confirmed' })
           .eq('id', selectedPaymentBooking.id);
 
-        if (!error) {
+        if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
           setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed' } : b));
           setPaymentSuccessMessage(`Payment of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} completed via Razorpay!`);
           setTimeout(() => {
@@ -230,7 +230,7 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
       .update({ payment_status: 'paid', status: 'confirmed' })
       .eq('id', selectedPaymentBooking.id);
 
-    if (!error) {
+    if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
       setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed' } : b));
       setPaymentSuccessMessage(`Payment of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} completed!`);
       setTimeout(() => {
@@ -340,13 +340,19 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
                       >
                         <Download className="w-3.5 h-3.5" /> Download Receipt
                       </button>
-                    ) : (
+                    ) : b.status === 'vendor_accepted' || b.status === 'confirmed' ? (
                       <button
                         onClick={() => setSelectedPaymentBooking(b)}
                         className="text-xs font-bold bg-gradient-brand text-white px-4 py-2 rounded-xl shadow-sm hover:scale-105 transition-all flex items-center gap-1.5"
                       >
                         <CreditCard className="w-3.5 h-3.5" /> Pay via Razorpay
                       </button>
+                    ) : b.status === 'pending_vendor_approval' || b.status === 'pending' ? (
+                       <span className="text-xs font-bold text-dark-500 bg-cream-100 px-4 py-2 rounded-xl">Awaiting Approval</span>
+                    ) : b.status === 'rejected' || b.status === 'cancelled' ? (
+                       <span className="text-xs font-bold text-red-600 bg-red-50 px-4 py-2 rounded-xl">Booking {b.status === 'rejected' ? 'Rejected' : 'Cancelled'}</span>
+                    ) : (
+                      <span className="text-xs font-bold text-dark-400">Payment Unavailable</span>
                     )}
                   </td>
                 </tr>
@@ -524,10 +530,12 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 text-dark-500 text-[11px] bg-cream-50 p-2.5 rounded-xl border border-cream-200">
-                    <Lock className="w-3.5 h-3.5 text-sage-600 flex-shrink-0" />
-                    <span>Transactions are 256-bit SSL Encrypted & Secured</span>
-                  </div>
+                  {paymentMethod === 'card' && (
+                    <div className="flex items-center gap-2 text-dark-500 text-[11px] bg-cream-50 p-2.5 rounded-xl border border-cream-200">
+                      <Lock className="w-3.5 h-3.5 text-sage-600 flex-shrink-0" />
+                      <span>Transactions are 256-bit SSL Encrypted & Secured</span>
+                    </div>
+                  )}
 
                   {/* Submit Buttons */}
                   <div className="flex gap-2 pt-1">
