@@ -35,10 +35,33 @@ export function EarningsPage() {
   const [serv, setServ] = useState('');
   const [amt, setAmt] = useState('');
   const [txType, setTxType] = useState<'credit' | 'payout'>('credit');
+  const now = new Date();
+  
+  const todayRevenue = transactions.filter(t => {
+    if (t.type !== 'credit' || t.status !== 'completed') return false;
+    const d = t.rawDate ? new Date(t.rawDate) : new Date();
+    return d.toDateString() === now.toDateString();
+  }).reduce((acc, curr) => acc + curr.rawAmount, 0);
 
-  const totalRevenue = transactions
-    .filter(t => t.type === 'credit')
+  const weeklyRevenueAmount = transactions.filter(t => {
+    if (t.type !== 'credit' || t.status !== 'completed') return false;
+    const d = t.rawDate ? new Date(t.rawDate) : new Date();
+    const diffTime = Math.abs(now.getTime() - d.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    return diffDays <= 7;
+  }).reduce((acc, curr) => acc + curr.rawAmount, 0);
+
+  const monthlyRevenueAmount = transactions.filter(t => {
+    if (t.type !== 'credit' || t.status !== 'completed') return false;
+    const d = t.rawDate ? new Date(t.rawDate) : new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).reduce((acc, curr) => acc + curr.rawAmount, 0);
+
+  const pendingRevenue = transactions
+    .filter(t => t.type === 'credit' && t.status === 'pending')
     .reduce((acc, curr) => acc + curr.rawAmount, 0);
+
+  const pendingCount = transactions.filter(t => t.type === 'credit' && t.status === 'pending').length;
 
   const handleAddTx = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,10 +104,10 @@ export function EarningsPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString('en-IN')}`, change: 'Real-time', trend: 'up', bg: 'bg-gradient-brand', text: 'text-white' },
-          { label: 'This Week', value: `₹${totalRevenue.toLocaleString('en-IN')}`, change: 'Current week', trend: 'up', bg: 'bg-card', text: 'text-dark-900' },
-          { label: 'Pending Bookings', value: '₹0', change: '0 pending', trend: 'down', bg: 'bg-card', text: 'text-dark-900' },
-          { label: 'Verified Payouts', value: '₹0', change: 'Instant UPI', trend: 'up', bg: 'bg-card', text: 'text-dark-900' },
+          { label: 'Today', value: `₹${todayRevenue.toLocaleString('en-IN')}`, change: 'Real-time', trend: 'up', bg: 'bg-gradient-brand', text: 'text-white' },
+          { label: 'This Week', value: `₹${weeklyRevenueAmount.toLocaleString('en-IN')}`, change: 'Last 7 days', trend: 'up', bg: 'bg-card', text: 'text-dark-900' },
+          { label: 'This Month', value: `₹${monthlyRevenueAmount.toLocaleString('en-IN')}`, change: 'Current month', trend: 'up', bg: 'bg-card', text: 'text-dark-900' },
+          { label: 'Pending Bookings', value: `₹${pendingRevenue.toLocaleString('en-IN')}`, change: `${pendingCount} pending`, trend: pendingCount > 0 ? 'up' : 'down', bg: 'bg-card', text: 'text-dark-900' },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
