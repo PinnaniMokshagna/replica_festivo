@@ -127,6 +127,21 @@ export default function VendorDashboard() {
     };
 
     fetchData();
+
+    // Subscribe to realtime booking updates for instant sync
+    const channel = supabase.channel('public:bookings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   // Fetch services when tab opens
@@ -281,7 +296,10 @@ export default function VendorDashboard() {
     setSavingProfile(false);
   };
 
-  const totalRevenue = bookings.filter(b => b.payment_status === 'paid').reduce((s, b) => s + b.total_amount, 0);
+  const totalRevenue = bookings.filter(b => b.payment_status === 'paid').reduce((s, b) => {
+    const val = typeof b.total_amount === 'string' ? Number(b.total_amount.replace(/[^0-9.-]+/g, "")) || 0 : b.total_amount;
+    return s + (val || 0);
+  }, 0);
   const thisMonth = bookings.filter(b => {
     const d = new Date(b.created_at);
     const now = new Date();
@@ -319,27 +337,35 @@ export default function VendorDashboard() {
   };
 
   // Earnings calculations
-  const paidBookings = bookings.filter(b => b.payment_status === 'paid');
-  const totalEarnings = paidBookings.reduce((s, b) => s + b.total_amount, 0);
-  const thisMonthEarnings = paidBookings.filter(b => {
+  const parseAmount = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') return Number(val.replace(/[^0-9.-]+/g, "")) || 0;
+    return 0;
+  };
+
+  const completedBookings = bookings.filter(b => b.payment_status === 'paid');
+  const pendingBookingsList = bookings.filter(b => b.payment_status !== 'paid' && b.status !== 'cancelled' && b.status !== 'rejected');
+
+  const totalEarnings = completedBookings.reduce((s, b) => s + parseAmount(b.total_amount), 0);
+  const thisMonthEarnings = completedBookings.filter(b => {
     const d = new Date(b.created_at);
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }).reduce((s, b) => s + b.total_amount, 0);
-  const pendingPayout = paidBookings.filter(b => b.status === 'confirmed').reduce((s, b) => s + b.total_amount, 0);
+  }).reduce((s, b) => s + parseAmount(b.total_amount), 0);
+  const pendingPayout = pendingBookingsList.reduce((s, b) => s + parseAmount(b.total_amount), 0);
   const commissionPaid = Math.round(totalEarnings * 0.15);
 
   // Monthly earnings for last 6 months
   const monthlyEarnings = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - (5 - i));
-    const monthBookings = paidBookings.filter(b => {
+    const monthBookings = completedBookings.filter(b => {
       const bd = new Date(b.created_at);
       return bd.getMonth() === d.getMonth() && bd.getFullYear() === d.getFullYear();
     });
     return {
       label: d.toLocaleDateString('en-IN', { month: 'short' }),
-      amount: monthBookings.reduce((s, b) => s + b.total_amount, 0),
+      amount: monthBookings.reduce((s, b) => s + parseAmount(b.total_amount), 0),
     };
   });
   const maxEarning = Math.max(...monthlyEarnings.map(m => m.amount), 1);
@@ -706,7 +732,7 @@ export default function VendorDashboard() {
                     </thead>
                     <tbody className="divide-y divide-sage-50">
                       {monthlyEarnings.map((m, i) => {
-                        const monthBookings = paidBookings.filter(b => {
+                        const monthBookings = completedBookings.filter(b => {
                           const bd = new Date(b.created_at);
                           const md = new Date();
                           md.setMonth(md.getMonth() - (5 - i));
