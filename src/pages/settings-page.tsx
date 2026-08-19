@@ -39,20 +39,20 @@ export function SettingsPage() {
   const [bankAccount, setBankAccount] = useState(user.bankAccount || '');
   const [ifsc, setIfsc] = useState(user.ifsc || '');
 
-  // Keep form in sync when user profile finishes loading
+  // Keep form in sync when user profile finishes loading from Supabase
   useEffect(() => {
-    if (user.fullName) setFullName(user.fullName);
-    if (user.username) setUsernameInput(user.username);
-    if (user.website) setWebsite(user.website);
-    if (user.email) setEmail(user.email);
-    if (user.phone) setPhone(user.phone);
-    if (user.location) setLocation(user.location);
-    if (user.businessName) setBusinessName(user.businessName);
-    if (user.category) setCategory(user.category);
-    if (user.bio) setBio(user.bio);
-    if (user.upiId) setUpiId(user.upiId);
-    if (user.bankAccount) setBankAccount(user.bankAccount);
-    if (user.ifsc) setIfsc(user.ifsc);
+    if (user.fullName !== undefined) setFullName(user.fullName);
+    if (user.username !== undefined) setUsernameInput(user.username);
+    if (user.website !== undefined) setWebsite(user.website);
+    if (user.email !== undefined) setEmail(user.email);
+    if (user.phone !== undefined) setPhone(user.phone);
+    if (user.location !== undefined) setLocation(user.location);
+    if (user.businessName !== undefined) setBusinessName(user.businessName);
+    if (user.category !== undefined) setCategory(user.category);
+    if (user.bio !== undefined) setBio(user.bio);
+    if (user.upiId !== undefined) setUpiId(user.upiId);
+    if (user.bankAccount !== undefined) setBankAccount(user.bankAccount);
+    if (user.ifsc !== undefined) setIfsc(user.ifsc);
   }, [user]);
 
   const usernameRule = canChangeUsername();

@@ -197,23 +197,11 @@ export default function VendorsPage() {
         // Match tags
         if (v.tags && v.tags.some(t => t.toLowerCase().includes(aCat) || aCat.includes(t.toLowerCase()))) return true;
 
-        // Match custom package categories created by the vendor
+        // Match custom package categories created by the vendor (loaded from Supabase)
         if ((v as any).custom_packages && Array.isArray((v as any).custom_packages)) {
           if ((v as any).custom_packages.some((p: any) => (p.category || '').toLowerCase().includes(aCat) || (p.name || '').toLowerCase().includes(aCat))) {
             return true;
           }
-        }
-
-        // Check stored packages for this vendor
-        const vSlug = v.slug || '';
-        const rawPkgs = vSlug ? localStorage.getItem(`vendor_packages_${vSlug}`) : null;
-        if (rawPkgs) {
-          try {
-            const parsed = JSON.parse(rawPkgs);
-            if (Array.isArray(parsed) && parsed.some((p: any) => (p.category || '').toLowerCase().includes(aCat) || (p.name || '').toLowerCase().includes(aCat))) {
-              return true;
-            }
-          } catch(e) {}
         }
 
         return false;

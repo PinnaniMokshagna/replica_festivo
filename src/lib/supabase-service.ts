@@ -64,19 +64,50 @@ export async function fetchVendorBySlug(slug: string): Promise<Vendor | null> {
       .maybeSingle();
 
     if (error || !data) {
+      // Vendor not yet in directory — try fetching packages by slug anyway
+      const { data: pkgsBySlug } = await supabase
+        .from('vendor_packages')
+        .select('*')
+        .eq('vendor_slug', slug)
+        .order('created_at', { ascending: false });
+
       const mock = MOCK_VENDORS.find(v => v.slug === slug || v.id === slug);
-      return mock || null;
+      if (mock) {
+        return {
+          ...mock,
+          custom_packages: pkgsBySlug && pkgsBySlug.length > 0 ? pkgsBySlug : (mock.custom_packages || []),
+        };
+      }
+      return null;
     }
 
-    // Fetch vendor packages
+    // Try to get vendor email from vendor_applications if not on vendors row
+    let vendorEmail = data.email || '';
+    if (!vendorEmail) {
+      const { data: appData } = await supabase
+        .from('vendor_applications')
+        .select('email')
+        .eq('business_name', data.name)
+        .maybeSingle();
+      vendorEmail = appData?.email || '';
+    }
+
+    // Fetch packages: try all possible identifiers
+    const orClause = [
+      `vendor_slug.eq.${slug}`,
+      `vendor_id.eq.${data.id}`,
+      ...(vendorEmail ? [`vendor_email.eq.${vendorEmail}`] : []),
+    ].join(',');
+
     const { data: pkgs } = await supabase
       .from('vendor_packages')
       .select('*')
-      .or(`vendor_slug.eq.${slug},vendor_id.eq.${data.id},vendor_email.eq.${data.email || ''}`);
+      .or(orClause)
+      .order('created_at', { ascending: false });
 
     return {
       ...data,
-      custom_packages: pkgs && pkgs.length > 0 ? pkgs : data.custom_packages || [],
+      custom_packages: pkgs && pkgs.length > 0 ? pkgs : (data.custom_packages || []),
     };
   } catch (e) {
     console.warn('fetchVendorBySlug failed:', e);

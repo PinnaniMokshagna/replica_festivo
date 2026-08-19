@@ -50,21 +50,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = s?.data?.session?.user;
       if (currentUser) {
         localStorage.setItem('festivo_user', JSON.stringify(currentUser));
-        const userFullName = data.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Vendor';
-        const isStudio = userFullName.toLowerCase().includes('studio') || userFullName.toLowerCase().includes('events') || userFullName.toLowerCase().includes('photography');
-        const businessName = isStudio ? userFullName : `${userFullName} Events`;
-        const slug = (userFullName || currentUser.email?.split('@')[0] || 'vendor').toLowerCase().replace(/[^a-z0-9]+/g, '.');
+        const userFullName = data.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || '';
+        const slug = (userFullName || currentUser.email?.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]+/g, '.');
 
         if (data.role === 'vendor' || currentUser.email?.includes('vendor')) {
+          // Write MINIMAL identity only — DashboardAuthProvider loads full profile from Supabase
+          const existingProfile = (() => {
+            try { return JSON.parse(localStorage.getItem('vendor_user_profile') || 'null'); } catch { return null; }
+          })();
+          const isSameUser = existingProfile && (existingProfile.email || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
           const vendorProfile = {
+            ...(isSameUser ? existingProfile : {}),
             id: currentUser.id,
             email: (currentUser.email || '').toLowerCase().trim(),
-            fullName: userFullName,
-            businessName,
-            category: 'Event Provider',
-            location: data.city ? `${data.city}, India` : 'Hyderabad, India',
-            phone: data.phone || '+91 98765 43210',
-            username: slug,
+            fullName: userFullName || existingProfile?.fullName || '',
+            username: existingProfile?.username || slug,
           };
           localStorage.setItem('vendor_user_profile', JSON.stringify(vendorProfile));
           localStorage.setItem('vendor_is_authenticated', 'true');
@@ -134,8 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.session.user.id,
           full_name: data.session.user.user_metadata?.full_name || emailLower.split('@')[0],
           role: role || 'vendor',
-          phone: '+91 98765 43210',
-          city: 'Hyderabad',
+          phone: '',
+          city: '',
           avatar_url: null
         };
 
@@ -147,26 +147,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('festivo_profile', JSON.stringify(finalProfile));
 
         const userFullName = finalProfile.full_name || data.session.user.user_metadata?.full_name || emailLower.split('@')[0];
-        const isStudio = userFullName.toLowerCase().includes('studio') || userFullName.toLowerCase().includes('events') || userFullName.toLowerCase().includes('photography');
-        const businessName = isStudio ? userFullName : `${userFullName} Events`;
         const slug = (userFullName || emailLower.split('@')[0]).toLowerCase().replace(/[^a-z0-9]+/g, '.');
 
+        // Write MINIMAL identity only — DashboardAuthProvider.loadUserProfileFromSupabase() fills the rest
+        const existingVP = (() => { try { return JSON.parse(localStorage.getItem('vendor_user_profile') || 'null'); } catch { return null; } })();
+        const isSameVP = existingVP && (existingVP.email || '').toLowerCase().trim() === emailLower;
         const vendorProfile = {
+          ...(isSameVP ? existingVP : {}),
           id: data.session.user.id,
           email: emailLower,
-          fullName: userFullName,
-          businessName,
-          category: 'Event Provider',
-          location: finalProfile.city ? `${finalProfile.city}, India` : 'Hyderabad, India',
-          phone: finalProfile.phone || '+91 98765 43210',
-          username: slug,
+          fullName: userFullName || existingVP?.fullName || '',
+          username: existingVP?.username || slug,
         };
 
         localStorage.setItem('vendor_user_profile', JSON.stringify(vendorProfile));
         localStorage.setItem('vendor_is_authenticated', 'true');
 
-        // --- Ensure vendor appears in Supabase vendor_applications ---
-        // This is the entry the admin dashboard reads from.
+        // --- Ensure vendor row exists in vendor_applications (ignoreDuplicates=true = never overwrites saved data) ---
         if (role === 'vendor' || !role) {
           try {
             await supabase
@@ -174,11 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .upsert({
                 user_id: data.session.user.id,
                 email: emailLower,
-                business_name: businessName,
                 owner_name: userFullName,
-                category: 'Event Provider',
-                location: finalProfile.city ? `${finalProfile.city}, India` : 'Hyderabad, India',
-                phone: finalProfile.phone || '',
                 status: 'pending',
                 updated_at: new Date().toISOString(),
               }, { onConflict: 'email', ignoreDuplicates: true });
@@ -186,7 +179,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.warn('Could not create vendor_applications entry:', e);
           }
         }
-
 
         window.dispatchEvent(new Event('storage'));
         try {
@@ -254,11 +246,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       full_name: finalName,
       role: isVendor ? 'vendor' : 'customer',
       phone: registeredVendorData?.details?.phone || '',
-      city: registeredVendorData?.location?.split(',')[0]?.trim() || 'Hyderabad',
+      city: registeredVendorData?.location?.split(',')[0]?.trim() || '',
       avatar_url: null,
     };
 
-    // Sync vendor_user_profile so the vendor dashboard shows correct details
+    // Write MINIMAL vendor identity — DashboardAuthProvider loads the rest from Supabase
     if (isVendor) {
       const existingVendorProfile = (() => {
         try { return JSON.parse(localStorage.getItem('vendor_user_profile') || 'null'); } catch { return null; }
@@ -268,27 +260,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...(isSameUser ? existingVendorProfile : {}),
         id: vendorId,
         email: emailLower,
-        fullName: finalName,
-        businessName: registeredVendorData?.name || businessName,
-        category: registeredVendorData?.category || (isSameUser ? existingVendorProfile?.category : 'Event Provider') || 'Event Provider',
-        location: registeredVendorData?.location || (isSameUser ? existingVendorProfile?.location : 'Hyderabad, India') || 'Hyderabad, India',
-        phone: registeredVendorData?.details?.phone || (isSameUser ? existingVendorProfile?.phone : '') || '',
-        username: slug,
+        fullName: finalName || existingVendorProfile?.fullName || '',
+        // Only carry forward user-saved fields — never inject fake defaults
+        businessName: existingVendorProfile?.businessName || (registeredVendorData?.name || ''),
+        category: existingVendorProfile?.category || registeredVendorData?.category || '',
+        location: existingVendorProfile?.location || registeredVendorData?.location || '',
+        phone: existingVendorProfile?.phone || registeredVendorData?.details?.phone || '',
+        username: existingVendorProfile?.username || slug,
       };
       safeSetItem('vendor_user_profile', JSON.stringify(mergedVendorProfile));
       safeSetItem('vendor_is_authenticated', 'true');
 
-      // Upsert to Supabase vendor_applications
+      // Upsert to Supabase vendor_applications (ignoreDuplicates = never overwrite saved data)
       try {
         await supabase
           .from('vendor_applications')
           .upsert({
             email: emailLower,
-            business_name: registeredVendorData?.name || businessName,
             owner_name: finalName,
-            category: registeredVendorData?.category || 'Event Provider',
-            location: registeredVendorData?.location || 'Hyderabad, India',
-            phone: registeredVendorData?.details?.phone || '',
             status: 'pending',
             updated_at: new Date().toISOString(),
           }, { onConflict: 'email', ignoreDuplicates: true });
@@ -366,25 +355,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: mockUser.id,
       full_name: finalName,
       role: role || 'customer',
-      phone: '+91 98765 43210',
-      city: 'Hyderabad',
+      phone: null,
+      city: null,
       avatar_url: null,
     };
 
     if (role === 'vendor') {
-      const isStudio = finalName.toLowerCase().includes('studio') ||
-        finalName.toLowerCase().includes('events') ||
-        finalName.toLowerCase().includes('photography');
-      const businessName = isStudio ? finalName : `${finalName} Events`;
-
+      const slug = emailPrefix.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       const newVendorProfile = {
         id: vendorId,
         email: emailLower,
         fullName: finalName,
-        businessName,
-        category: category || 'Photographer',
-        location: 'Hyderabad, India',
-        phone: '+91 98765 43210',
+        // Do NOT inject fake businessName, category, location, or phone
+        // DashboardAuthProvider will load real values from Supabase
         username: slug,
       };
       localStorage.setItem('vendor_user_profile', JSON.stringify(newVendorProfile));

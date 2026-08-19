@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 import {
   type BookingStatus,
   type NotificationItem,
@@ -177,17 +178,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const [vendorEmail, setVendorEmail] = useState<string>('');
-  const [vendorSlug, setVendorSlug] = useState<string>('');
+  const { user } = useAuth();
+  
+  const vendorEmail = (user?.email || '').toLowerCase().trim();
+  const vendorSlug = (user?.username || vendorEmail.split('@')[0] || '').toLowerCase().trim();
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email) {
-        setVendorEmail(user.email);
-        setVendorSlug(user.email.split('@')[0]);
-      }
-    });
-  }, []);
 
   // --- Bookings ---
   const [bookings, setBookings] = useState<ExtendedBooking[]>([]);
@@ -398,10 +393,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [vendorSlug, vendorEmail]);
 
   const addPackageItem = async (pkg: Omit<Package, 'id'>) => {
+    const vEmail = (pkg as any).vendorEmail || vendorEmail;
+    const vSlug = (pkg as any).vendorSlug || vendorSlug;
+
+    if (!vEmail) {
+      showToast('Failed to save package: Missing vendor identity.', 'error');
+      return;
+    }
+
     // Insert into Supabase FIRST to get the real UUID
     const { data: saved, error } = await createVendorPackage({
-      vendor_email: vendorEmail,
-      vendor_slug: vendorSlug,
+      vendor_email: vEmail,
+      vendor_slug: vSlug,
       name: pkg.name,
       category: pkg.category,
       package_type: pkg.packageType,
@@ -416,27 +419,35 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
     if (error) {
       console.error('Failed to create package in Supabase:', error);
-      showToast('Failed to save package. Please try again.', 'error');
+      showToast(`Failed to save package: ${error.message || 'Unknown error'}`, 'error');
       return;
     }
 
     // Use real Supabase UUID so reload fetches the same record
     const newPkg: Package = { ...pkg, id: saved?.id || 'pkg_' + Date.now() };
     setPackagesList(prev => [...prev, newPkg]);
-    syncVendorToCustomerDirectory([...packagesList, newPkg] as any[]);
+
+    syncVendorToCustomerDirectory([...packagesList, newPkg] as any[], user);
     showToast(`Package "${pkg.name}" created and published!`, 'success');
   };
 
   const editPackageItem = async (id: string, updated: Partial<Package>) => {
     setPackagesList(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
     await updateVendorPackage(id, updated as any);
-    showToast('Package updated successfully in Supabase!', 'success');
+    // Resync customer-facing directory after edit
+    const updatedList = packagesList.map(p => (p.id === id ? { ...p, ...updated } : p));
+    syncVendorToCustomerDirectory(updatedList as any[], user);
+    showToast('Package updated successfully!', 'success');
   };
 
   const deletePackageItem = async (id: string) => {
-    setPackagesList(prev => prev.filter(p => p.id !== id));
+    const remaining = packagesList.filter(p => p.id !== id);
+    setPackagesList(remaining);
     await deleteVendorPackage(id);
-    showToast('Package removed from Supabase', 'info');
+    // Resync so customer page removes the deleted package and resets pricing
+    syncVendorToCustomerDirectory(remaining as any[], user);
+
+    showToast('Package removed', 'info');
   };
 
   const togglePackagePopular = async (id: string) => {
@@ -448,6 +459,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       showToast('Popular tier tag updated');
     }
   };
+
 
   // --- Reviews ---
   const [reviewsList, setReviewsList] = useState<Review[]>([]);

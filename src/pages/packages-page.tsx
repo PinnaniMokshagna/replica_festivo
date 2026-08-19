@@ -139,11 +139,11 @@ export function PackagesPage() {
 
     const vId = user.id || 'active_vendor';
     const vEmail = (user.email || '').toLowerCase().trim();
-    const vName = (user.businessName || user.fullName || 'FLOWERS Events').trim();
+    const vName = (user.businessName || user.fullName || 'Festivo Vendor').trim();
     const vSlug = (
       user.username ||
       vName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    ).toLowerCase().trim().replace(/^@+/, '') || 'flowers-events';
+    ).toLowerCase().trim().replace(/^@+/, '') || 'vendor';
 
     const payload = {
       vendorId: vId,

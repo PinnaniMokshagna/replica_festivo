@@ -83,10 +83,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getInitialUser = (): UserProfile => {
     try {
       const saved = localStorage.getItem('vendor_user_profile');
-      // If we have a properly saved profile (has email), restore it directly — don't merge with DEFAULT_USER fake data
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed?.email) return { ...DEFAULT_USER, ...parsed };
+        // Evict known stale fake-data profiles — these were injected by old DEFAULT_USER or auth.tsx
+        const isStale = !parsed?.email ||
+          parsed.email === 'vendor@festivo.com' ||
+          parsed.bankAccount === '987654321098' ||
+          parsed.upiId === 'flowersevents@okhdfcbank';
+        if (isStale) {
+          localStorage.removeItem('vendor_user_profile');
+        } else {
+          // Valid saved profile — restore it; Supabase will update any stale fields on mount
+          return { ...DEFAULT_USER, ...parsed };
+        }
       }
 
       const festivoUser = localStorage.getItem('festivo_user');
@@ -410,12 +419,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const existingData = (existingApp?.data || {}) as Record<string, any>;
       const mergedData = {
         ...existingData,
-        upiId: updatedUser.upiId || existingData.upiId || '',
-        bankAccount: updatedUser.bankAccount || existingData.bankAccount || '',
-        ifsc: updatedUser.ifsc || existingData.ifsc || '',
-        website: updatedUser.website || existingData.website || '',
-        bio: updatedUser.bio || existingData.bio || '',
-        username: updatedUser.username || existingData.username || '',
+        upiId: updatedUser.upiId ?? existingData.upiId ?? '',
+        bankAccount: updatedUser.bankAccount ?? existingData.bankAccount ?? '',
+        ifsc: updatedUser.ifsc ?? existingData.ifsc ?? '',
+        website: updatedUser.website ?? existingData.website ?? '',
+        bio: updatedUser.bio ?? existingData.bio ?? '',
+        username: updatedUser.username ?? existingData.username ?? '',
       };
 
       // 2. Persist to Supabase vendor_applications table

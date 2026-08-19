@@ -23,7 +23,9 @@ export interface SyncedVendorPackage {
 export async function syncVendorToCustomerDirectory(packages: SyncedVendorPackage[], vendorProfile?: any) {
   try {
     let profile = vendorProfile;
+
     if (!profile) {
+      // Try Supabase Auth first
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
       if (user) {
@@ -33,10 +35,21 @@ export async function syncVendorToCustomerDirectory(packages: SyncedVendorPackag
           email: user.email,
           fullName: p?.full_name || user.email?.split('@')[0] || 'Vendor',
           businessName: p?.full_name || 'Festivo Partner',
-          category: 'Event Provider',
-          location: p?.city ? `${p.city}, India` : 'Hyderabad, India',
+          category: '',
+          location: p?.city ? `${p.city}, India` : '',
         };
       }
+    }
+
+    // Fallback: read from localStorage (custom login stores profile here)
+    if (!profile) {
+      try {
+        const saved = localStorage.getItem('vendor_user_profile');
+        if (saved) {
+          const p = JSON.parse(saved);
+          if (p?.email) profile = p;
+        }
+      } catch (_) {}
     }
 
     if (!profile) return;
@@ -93,7 +106,7 @@ export async function syncVendorToCustomerDirectory(packages: SyncedVendorPackag
           badge: 'Verified Partner',
           badge_color: 'bg-sage-600',
           email: vEmail,
-          phone: profile.phone || '+91 98765 43210',
+          phone: profile.phone || '',
         },
         { onConflict: 'slug' }
       )
