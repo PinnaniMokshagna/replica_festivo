@@ -39,6 +39,9 @@ export interface ExtendedBooking {
   budget: string;
   status: BookingStatus;
   notes?: string;
+  rejection_reason?: string;
+  payment_status?: string;
+  rawAmount?: number;
 }
 
 export interface CalendarEventItem {
@@ -96,6 +99,7 @@ export interface TransactionItem {
   service: string;
   type: 'credit' | 'payout';
   date: string;
+  rawDate?: string;
   status: 'completed' | 'pending';
 }
 
@@ -113,7 +117,7 @@ export interface SupportTicketItem {
 interface DataContextType {
   bookings: ExtendedBooking[];
   addBooking: (booking: Omit<ExtendedBooking, 'id'>) => void;
-  updateBookingStatus: (id: string, status: BookingStatus) => void;
+  updateBookingStatus: (id: string, status: BookingStatus, rejection_reason?: string) => void;
   deleteBooking: (id: string) => void;
 
   calendarEvents: CalendarEventItem[];
@@ -190,7 +194,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!vendorEmail && !vendorSlug) return;
     const loadVendorBookings = async () => {
-      const data = await fetchBookingsForVendor(vendorEmail || vendorSlug);
+      const data = await fetchBookingsForVendor(vendorEmail || vendorSlug, user?.id);
       if (data && data.length > 0) {
         setBookings(
           data.map(b => ({
@@ -202,8 +206,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             time: '10:00 AM',
             location: 'Client Location',
             budget: `₹${b.total_amount?.toLocaleString('en-IN')}`,
+            payment_status: b.payment_status,
+            rawAmount: b.total_amount || 0,
             status: (b.status as BookingStatus) || 'confirmed',
             notes: b.special_requests || '',
+            rejection_reason: b.rejection_reason || undefined,
           }))
         );
       } else {
@@ -219,10 +226,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     showToast(`Booking for ${booking.customer} created successfully!`);
   };
 
-  const updateBookingStatus = async (id: string, status: BookingStatus) => {
-    setBookings(prev => prev.map(b => (b.id === id ? { ...b, status } : b)));
-    await updateBookingStatusInDb(id, status as any);
-    showToast(`Booking status updated to ${status.toUpperCase()}`);
+  const updateBookingStatus = async (id: string, status: BookingStatus, rejection_reason?: string) => {
+    setBookings(prev => prev.map(b => (b.id === id ? { ...b, status, rejection_reason: rejection_reason || b.rejection_reason } : b)));
+    await updateBookingStatusInDb(id, status as any, rejection_reason);
+    showToast(`Booking status updated to ${status.replace(/_/g, ' ').toUpperCase()}`);
   };
 
   const deleteBooking = (id: string) => {
@@ -512,8 +519,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
 
+  useEffect(() => {
+    const bookingTxs = bookings
+      .filter(b => b.status === 'pending' || b.status === 'confirmed' || b.payment_status === 'paid')
+      .map(b => ({
+        id: `tx_${b.id}`,
+        amount: `₹${(b.rawAmount || 0).toLocaleString('en-IN')}`,
+        rawAmount: b.rawAmount || 0,
+        customer: b.customer,
+        service: b.type,
+        type: 'credit' as const,
+        date: new Date(b.date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+        rawDate: b.date,
+        status: (b.payment_status === 'paid' ? 'completed' : 'pending') as 'completed' | 'pending',
+      }));
+
+    setTransactions(prev => {
+      const manual = prev.filter(t => !t.id.startsWith('tx_'));
+      return [...bookingTxs, ...manual].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+  }, [bookings]);
+
   const addTransactionItem = (tx: Omit<TransactionItem, 'id'>) => {
-    const newTx: TransactionItem = { ...tx, id: 'tx_' + Date.now() };
+    const newTx: TransactionItem = { ...tx, id: 'tx_manual_' + Date.now() };
     setTransactions(prev => [newTx, ...prev]);
     showToast(`Transaction of ${tx.amount} logged!`);
   };
