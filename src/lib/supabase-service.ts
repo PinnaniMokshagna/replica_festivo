@@ -175,6 +175,40 @@ export async function deleteVendorPackage(id: string): Promise<{ error: any }> {
 // 3. BOOKINGS
 // ============================================================================
 
+// Helper to map DB statuses back to our conceptual workflow statuses
+function parseBookingData(b: any): Booking {
+  let mappedStatus = b.status;
+  
+  if (b.status === 'pending') {
+    mappedStatus = 'pending_vendor_approval';
+  } else if (b.status === 'confirmed' && b.payment_status === 'unpaid') {
+    mappedStatus = 'vendor_accepted';
+  }
+
+  let rejection_reason = undefined;
+  let special_requests = b.special_requests;
+  
+  if (special_requests && special_requests.includes('[REJECTION_REASON:')) {
+    const match = special_requests.match(/\[REJECTION_REASON:\s*(.*?)\]/);
+    if (match) {
+      rejection_reason = match[1];
+      special_requests = special_requests.replace(/\n*\[REJECTION_REASON:\s*.*?\]/, '');
+    }
+  }
+
+  if (b.status === 'cancelled') {
+    mappedStatus = 'rejected';
+  }
+
+  return {
+    ...b,
+    status: mappedStatus,
+    special_requests,
+    rejection_reason,
+    vendor: Array.isArray(b.vendor) ? b.vendor[0] : b.vendor,
+  };
+}
+
 export async function fetchBookingsForCustomer(customerEmail: string): Promise<Booking[]> {
   try {
     const cleanEmail = customerEmail.trim().toLowerCase();
@@ -185,35 +219,62 @@ export async function fetchBookingsForCustomer(customerEmail: string): Promise<B
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(b => ({
-      ...b,
-      vendor: Array.isArray(b.vendor) ? b.vendor[0] : b.vendor,
-    }));
+    return (data || []).map(parseBookingData);
   } catch (e) {
     console.warn('fetchBookingsForCustomer error:', e);
     return [];
   }
 }
 
-export async function fetchBookingsForVendor(vendorEmailOrSlug: string): Promise<Booking[]> {
+export async function fetchBookingsForVendor(vendorEmailOrSlug: string, vendorId?: string): Promise<Booking[]> {
   try {
-    // Get vendor id first if possible
-    const { data: vData } = await supabase
-      .from('vendors')
-      .select('id, email, slug')
-      .or(`slug.eq.${vendorEmailOrSlug},email.eq.${vendorEmailOrSlug}`)
-      .maybeSingle();
+    // 1. Try to find the vendor application to get the business name / slug
+    let vendorBusinessName = '';
+    if (vendorId) {
+      const { data: appData } = await supabase
+        .from('vendor_applications')
+        .select('business_name, email')
+        .eq('user_id', vendorId)
+        .maybeSingle();
+      if (appData?.business_name) {
+        vendorBusinessName = appData.business_name;
+      }
+    }
 
+    // 2. Get vendor id from vendors table using all possible identifiers
+    let vQuery = supabase.from('vendors').select('id, email, slug, name');
+    
+    let vOrs = [`slug.eq.${vendorEmailOrSlug}`, `email.eq.${vendorEmailOrSlug}`];
+    if (vendorBusinessName) {
+      vOrs.push(`name.eq.${vendorBusinessName}`);
+      const derivedSlug = vendorBusinessName.toLowerCase().replace(/\s+/g, '-');
+      vOrs.push(`slug.eq.${derivedSlug}`);
+    }
+    
+    const { data: vData } = await vQuery.or(vOrs.join(',')).maybeSingle();
+
+    let orConditions = [];
+    const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    if (vData?.id && isUuid(vData.id)) orConditions.push(`vendor_id.eq.${vData.id}`);
+    if (vData?.slug && isUuid(vData.slug)) orConditions.push(`vendor_id.eq.${vData.slug}`);
+    if (vData?.email && isUuid(vData.email)) orConditions.push(`vendor_id.eq.${vData.email}`);
+    if (vendorId && isUuid(vendorId)) orConditions.push(`vendor_id.eq.${vendorId}`);
+    if (vendorEmailOrSlug && isUuid(vendorEmailOrSlug)) orConditions.push(`vendor_id.eq.${vendorEmailOrSlug}`);
+    
+    // remove duplicates
+    orConditions = [...new Set(orConditions)];
+    
     let query = supabase.from('bookings').select('*, vendor:vendors(*)');
-    if (vData?.id) {
-      query = query.eq('vendor_id', vData.id);
+    if (orConditions.length > 0) {
+      query = query.or(orConditions.join(','));
     } else {
       return [];
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return (data || []).map(parseBookingData);
   } catch (e) {
     console.warn('fetchBookingsForVendor error:', e);
     return [];
@@ -229,10 +290,7 @@ export async function fetchBookingByRef(bookingRef: string): Promise<Booking | n
       .maybeSingle();
 
     if (error || !data) return null;
-    return {
-      ...data,
-      vendor: Array.isArray(data.vendor) ? data.vendor[0] : data.vendor,
-    };
+    return parseBookingData(data);
   } catch (e) {
     console.warn('fetchBookingByRef error:', e);
     return null;
@@ -247,9 +305,26 @@ export async function createBookingInDb(bookingData: Partial<Booking>): Promise<
   }
 }
 
-export async function updateBookingStatusInDb(id: string, status: Booking['status']): Promise<{ error: any }> {
+export async function updateBookingStatusInDb(id: string, status: Booking['status'], rejection_reason?: string): Promise<{ error: any }> {
   try {
-    return await supabase.from('bookings').update({ status }).eq('id', id);
+    // Map conceptual statuses to DB-allowed statuses
+    let dbStatus = status;
+    if (status === 'pending_vendor_approval') dbStatus = 'pending';
+    if (status === 'vendor_accepted') dbStatus = 'confirmed';
+    if (status === 'rejected') dbStatus = 'cancelled';
+
+    const updatePayload: any = { status: dbStatus };
+    
+    // If there is a rejection reason, append it to special_requests to avoid schema errors
+    if (rejection_reason) {
+      const { data: existing } = await supabase.from('bookings').select('special_requests').eq('id', id).single();
+      const currentReqs = existing?.special_requests || '';
+      updatePayload.special_requests = currentReqs 
+        ? `${currentReqs}\n\n[REJECTION_REASON: ${rejection_reason}]`
+        : `[REJECTION_REASON: ${rejection_reason}]`;
+    }
+    
+    return await supabase.from('bookings').update(updatePayload).eq('id', id);
   } catch (e) {
     return { error: e };
   }
@@ -306,14 +381,32 @@ export async function toggleSavedVendorInDb(userEmail: string, vendorId: string)
 
 export async function fetchReviewsForVendor(vendorSlugOrId: string): Promise<Review[]> {
   try {
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('*')
-      .or(`vendor_slug.eq.${vendorSlugOrId},vendor_id.eq.${vendorSlugOrId}`)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
+    let vendorId = vendorSlugOrId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vendorSlugOrId);
+    
+    if (!isUuid) {
+      const vendor = await fetchVendorBySlug(vendorSlugOrId);
+      if (vendor && vendor.id) {
+        vendorId = vendor.id;
+      } else {
+        // Mock vendors fallback
+        vendorId = vendorSlugOrId; 
+      }
+    }
+    
+    // Check if it's a UUID again after resolving
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vendorId)) {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('vendor_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } else {
+      // Not a real UUID (likely a mock vendor), don't query supabase
+      return [];
+    }
   } catch (e) {
     console.warn('fetchReviewsForVendor error:', e);
     return [];
