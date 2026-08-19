@@ -143,7 +143,7 @@ export default function BookingPage() {
     const bookingRef = `FEST-${Date.now().toString().slice(-8)}`;
 
     try {
-      await createBookingInDb({
+      const { error } = await createBookingInDb({
         vendor_id: vendor.id,
         customer_name: form.customer_name,
         customer_email: form.customer_email,
@@ -160,8 +160,11 @@ export default function BookingPage() {
         package_price: selectedPriceRaw || undefined,
       });
 
+      if (error) throw error;
+
       navigate(`/confirmation/${bookingRef}`);
-    } catch {
+    } catch (err) {
+      console.error("Booking error:", err);
       setErrors({ submit: 'Booking failed. Please try again.' });
     } finally {
       setSubmitting(false);

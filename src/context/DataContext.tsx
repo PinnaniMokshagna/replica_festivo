@@ -206,6 +206,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             notes: b.special_requests || '',
           }))
         );
+      } else {
+        setBookings([]);
       }
     };
     loadVendorBookings();
@@ -245,6 +247,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             customer: e.customer || '',
           }))
         );
+      } else {
+        setCalendarEvents([]);
       }
     });
   }, [vendorEmail]);
@@ -336,6 +340,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             date: p.date || 'Recent',
           }))
         );
+      } else {
+        setPortfolioItems([]);
       }
     });
   }, [vendorEmail]);
@@ -388,6 +394,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             popular: p.popular,
           }))
         );
+      } else {
+        setPackagesList([]);
       }
     });
   }, [vendorSlug, vendorEmail]);
@@ -481,6 +489,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             reply: r.vendor_reply,
           }))
         );
+      } else {
+        setReviewsList([]);
       }
     });
   }, [vendorSlug]);
@@ -525,6 +535,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             status: d.status,
           }))
         );
+      } else {
+        setDealsList([]);
       }
     });
   }, [vendorEmail]);

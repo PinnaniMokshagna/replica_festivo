@@ -207,6 +207,8 @@ export async function fetchBookingsForVendor(vendorEmailOrSlug: string): Promise
     let query = supabase.from('bookings').select('*, vendor:vendors(*)');
     if (vData?.id) {
       query = query.eq('vendor_id', vData.id);
+    } else {
+      return [];
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
