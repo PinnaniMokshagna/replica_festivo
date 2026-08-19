@@ -6,12 +6,7 @@ export function sanitizeForStorage(value: any): any {
   if (value === null || value === undefined) return value;
   
   if (typeof value === 'string') {
-    if (value.startsWith('data:') && value.length > 1000) {
-      if (value.startsWith('data:image')) {
-        return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800';
-      }
-      return 'uploaded_document.pdf';
-    }
+    // Keep data URLs so uploaded document images are preserved for Admin inspection
     return value;
   }
 
@@ -32,47 +27,16 @@ export function sanitizeForStorage(value: any): any {
 
 /**
  * Safe localStorage helper that handles QuotaExceededError gracefully
- * Truncates huge base64 strings and clears non-essential cache if storage exceeds limit
+ * Saves full values without replacing user images
  */
 export function safeSetItem(key: string, value: string): void {
-  let cleanedValue = value;
-
-  // If value contains a data URL or is very large, sanitize it first
-  if (typeof value === 'string' && (value.includes('data:') || value.length > 20000)) {
-    try {
-      const parsed = JSON.parse(value);
-      cleanedValue = JSON.stringify(sanitizeForStorage(parsed));
-    } catch {
-      if (value.startsWith('data:') && value.length > 1000) {
-        cleanedValue = value.startsWith('data:image')
-          ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'
-          : 'uploaded_document.pdf';
-      }
-    }
-  }
-
   try {
-    localStorage.setItem(key, cleanedValue);
+    localStorage.setItem(key, value);
   } catch (err: any) {
-    console.warn(`localStorage quota exceeded when writing '${key}'. Cleaning up storage...`, err);
-
+    console.warn(`localStorage quota exceeded when writing '${key}'. Cleaning up non-essential cache...`, err);
     try {
-      // 1. Remove non-critical caches
       localStorage.removeItem('festivo_cache');
-
-      // Trim admin notifications if too long
-      const notifsRaw = localStorage.getItem('festivo_admin_notifications');
-      if (notifsRaw) {
-        try {
-          const notifs = JSON.parse(notifsRaw);
-          if (Array.isArray(notifs) && notifs.length > 3) {
-            localStorage.setItem('festivo_admin_notifications', JSON.stringify(notifs.slice(0, 3)));
-          }
-        } catch {}
-      }
-
-      // 2. Try saving sanitized value
-      localStorage.setItem(key, cleanedValue);
+      localStorage.setItem(key, value);
     } catch (retryErr) {
       console.warn(`Unable to save '${key}' to localStorage even after cleanup:`, retryErr);
     }

@@ -71,7 +71,7 @@ export function SettingsPage() {
     }
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Process username change rule
@@ -84,7 +84,7 @@ export function SettingsPage() {
       showToast(result.message, 'success');
     }
 
-    updateProfile({
+    await updateProfile({
       fullName,
       website,
       email,
@@ -98,7 +98,7 @@ export function SettingsPage() {
       ifsc,
     });
 
-    showToast('Profile & Settings saved successfully!');
+    showToast('Profile & Settings saved successfully to Supabase!', 'success');
   };
 
   const tabs = [

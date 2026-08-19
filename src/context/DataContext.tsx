@@ -398,10 +398,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [vendorSlug, vendorEmail]);
 
   const addPackageItem = async (pkg: Omit<Package, 'id'>) => {
-    const newPkg: Package = { ...pkg, id: 'pkg_' + Date.now() };
-    setPackagesList(prev => [...prev, newPkg]);
-
-    await createVendorPackage({
+    // Insert into Supabase FIRST to get the real UUID
+    const { data: saved, error } = await createVendorPackage({
       vendor_email: vendorEmail,
       vendor_slug: vendorSlug,
       name: pkg.name,
@@ -416,8 +414,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       popular: pkg.popular,
     });
 
+    if (error) {
+      console.error('Failed to create package in Supabase:', error);
+      showToast('Failed to save package. Please try again.', 'error');
+      return;
+    }
+
+    // Use real Supabase UUID so reload fetches the same record
+    const newPkg: Package = { ...pkg, id: saved?.id || 'pkg_' + Date.now() };
+    setPackagesList(prev => [...prev, newPkg]);
     syncVendorToCustomerDirectory([...packagesList, newPkg] as any[]);
-    showToast(`Package "${pkg.name}" created and published to Supabase!`, 'success');
+    showToast(`Package "${pkg.name}" created and published!`, 'success');
   };
 
   const editPackageItem = async (id: string, updated: Partial<Package>) => {

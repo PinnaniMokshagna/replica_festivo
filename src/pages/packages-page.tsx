@@ -26,11 +26,12 @@ export function PackagesPage() {
   const { packagesList, addPackageItem, editPackageItem, deletePackageItem, togglePackagePopular, showToast } = useData();
   const { user, kycRecord } = useAuth();
 
-  // Check strictly if vendor has submitted payment details (Bank Account or UPI ID) in settings
+  // Check strictly if vendor has submitted payment details (Bank Account, UPI ID, IFSC or KYC Bank Proof)
   const hasBankDetails = Boolean(
     (user.bankAccount && user.bankAccount.trim()) ||
     (user.upiId && user.upiId.trim()) ||
-    (user.ifsc && user.ifsc.trim())
+    (user.ifsc && user.ifsc.trim()) ||
+    (kycRecord?.bankProofFile)
   );
 
   const [isModalOpen, setIsModalOpen] = useState(false);

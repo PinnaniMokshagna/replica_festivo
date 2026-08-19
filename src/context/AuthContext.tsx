@@ -7,45 +7,45 @@ export interface KycDocumentRecord {
   govtIdType: string;
   govtIdNumber: string;
   govtIdFile?: string;
+  bankProofFile?: string;
   businessRegNumber?: string;
   businessRegFile?: string;
-  bankProofFile?: string;
   submittedAt: string;
 }
 
 export interface UserProfile {
   id: string;
-  email: string;
   fullName: string;
-  username: string;
-  website: string;
   businessName: string;
   category: string;
+  email: string;
   phone: string;
   location: string;
   bio: string;
-  avatar: string;
   upiId: string;
   bankAccount: string;
   ifsc: string;
+  website: string;
+  avatar: string;
+  username: string;
   usernameHistory: number[];
 }
 
-const DEFAULT_USER: UserProfile = {
+export const DEFAULT_USER: UserProfile = {
   id: '',
-  email: '',
   fullName: '',
-  username: '',
-  website: '',
   businessName: '',
   category: '',
+  email: '',
   phone: '',
   location: '',
   bio: '',
-  avatar: 'VN',
   upiId: '',
   bankAccount: '',
   ifsc: '',
+  website: '',
+  avatar: 'VN',
+  username: '',
   usernameHistory: [],
 };
 
@@ -61,7 +61,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<boolean>;
   signup: (email: string, name: string, business: string) => Promise<boolean>;
   logout: () => void;
-  updateProfile: (data: Partial<UserProfile>) => void;
+  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
 
   canChangeUsername: () => { allowed: boolean; remainingChanges: number; daysUntilReset?: number };
   changeUsername: (newUsername: string) => { success: boolean; message: string };
@@ -83,23 +83,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getInitialUser = (): UserProfile => {
     try {
       const saved = localStorage.getItem('vendor_user_profile');
-      if (saved) return { ...DEFAULT_USER, ...JSON.parse(saved) };
+      // If we have a properly saved profile (has email), restore it directly — don't merge with DEFAULT_USER fake data
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.email) return { ...DEFAULT_USER, ...parsed };
+      }
 
       const festivoUser = localStorage.getItem('festivo_user');
-      const festivoProfile = localStorage.getItem('festivo_profile');
       if (festivoUser) {
         const u = JSON.parse(festivoUser);
+        const festivoProfile = localStorage.getItem('festivo_profile');
         const p = festivoProfile ? JSON.parse(festivoProfile) : null;
-        const name = p?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Vendor';
-        const nameInitials = name.slice(0, 2).toUpperCase();
+        const name = p?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || '';
         return {
           ...DEFAULT_USER,
-          id: u.id || DEFAULT_USER.id,
-          email: u.email || DEFAULT_USER.email,
+          id: u.id || '',
+          email: u.email || '',
           fullName: name,
-          businessName: `${name} Events`,
-          username: (u.email?.split('@')[0] || 'vendor').toLowerCase().replace(/[^a-z0-9]/g, '.'),
-          avatar: nameInitials,
+          businessName: '',
+          username: (u.email?.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '.'),
+          avatar: name.slice(0, 2).toUpperCase() || 'VN',
         };
       }
     } catch (e) {}
@@ -116,6 +119,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [kycStatus, setKycStatus] = useState<KycStatus>('unverified');
   const [kycRecord, setKycRecord] = useState<KycDocumentRecord | null>(null);
+
+  // Load complete vendor profile from Supabase — always trust DB values, never fall back to fake defaults
+  const loadUserProfileFromSupabase = useCallback(async (emailToFetch: string, authUser?: any) => {
+    const emailLower = (emailToFetch || '').toLowerCase().trim();
+    if (!emailLower) return;
+
+    try {
+      const { data: appData } = await supabase
+        .from('vendor_applications')
+        .select('*')
+        .eq('email', emailLower)
+        .maybeSingle();
+
+      const customData = (appData?.data || {}) as Record<string, any>;
+      const loadedFullName = appData?.owner_name || authUser?.user_metadata?.full_name || emailLower.split('@')[0];
+      const loadedBusinessName = appData?.business_name || (loadedFullName ? `${loadedFullName} Events` : '');
+      const loadedUsername = customData.username || (emailLower.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '.');
+
+      setUser(prev => {
+        const updated: UserProfile = {
+          ...prev,
+          id: authUser?.id || appData?.user_id || prev.id,
+          email: emailLower,
+          fullName: loadedFullName || prev.fullName,
+          businessName: loadedBusinessName || prev.businessName,
+          // Always use DB value; if DB returns empty string store empty string (no fake default)
+          category: appData?.category ?? customData.category ?? prev.category,
+          location: appData?.location ?? customData.location ?? prev.location,
+          phone: appData?.phone ?? customData.phone ?? prev.phone,
+          bio: customData.bio ?? prev.bio,
+          website: customData.website ?? prev.website,
+          upiId: customData.upiId ?? appData?.upi_id ?? prev.upiId,
+          bankAccount: customData.bankAccount ?? appData?.bank_account ?? prev.bankAccount,
+          ifsc: customData.ifsc ?? appData?.bank_ifsc ?? prev.ifsc,
+          username: loadedUsername || prev.username,
+          avatar: (loadedFullName || prev.fullName || 'VN').slice(0, 2).toUpperCase(),
+        };
+        localStorage.setItem('vendor_user_profile', JSON.stringify(updated));
+        return updated;
+      });
+    } catch (err) {
+      console.warn('Error loading vendor profile from Supabase:', err);
+    }
+  }, []);
 
   // Canonical query directly from Supabase
   const refreshKycStatus = useCallback(async () => {
@@ -135,7 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data) {
-        // Map database status
         if (data.status === 'approved') {
           setKycStatus('verified');
         } else if (data.status === 'kyc_submitted') {
@@ -143,7 +189,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (data.status === 'rejected') {
           setKycStatus('unverified');
         } else {
-          // pending registration without docs submitted
           const hasDocs = !!(data.govt_id_number || data.govt_id_file_url || data.bank_proof_file_url);
           setKycStatus(hasDocs ? 'pending' : 'unverified');
         }
@@ -169,13 +214,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sync with Supabase Auth session & setup Realtime / polling
   useEffect(() => {
-    // 1. Initial KYC status check
     refreshKycStatus();
 
-    // 2. Poll Supabase every 3 seconds for live approval updates across devices
     const interval = setInterval(refreshKycStatus, 3000);
 
-    // 3. Supabase Realtime channel for instant push updates
     const channel = supabase
       .channel('public:vendor_applications_realtime')
       .on(
@@ -183,12 +225,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         { event: '*', schema: 'public', table: 'vendor_applications' },
         () => {
           refreshKycStatus();
+          if (user.email) loadUserProfileFromSupabase(user.email);
         }
       )
       .subscribe();
 
-    // 4. Also listen to focus and storage events
-    const onFocusOrStorage = () => refreshKycStatus();
+    const onFocusOrStorage = () => {
+      refreshKycStatus();
+      if (user.email) loadUserProfileFromSupabase(user.email);
+    };
     window.addEventListener('focus', onFocusOrStorage);
     window.addEventListener('storage', onFocusOrStorage);
 
@@ -198,23 +243,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('focus', onFocusOrStorage);
       window.removeEventListener('storage', onFocusOrStorage);
     };
-  }, [refreshKycStatus]);
+  }, [refreshKycStatus, loadUserProfileFromSupabase, user.email]);
 
-  // Check Supabase active auth session on mount
+  // Check Supabase active auth session on mount & load complete profile
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setIsAuthenticated(true);
         const emailLower = (session.user.email || '').toLowerCase().trim();
-        const derivedName = session.user.user_metadata?.full_name || emailLower.split('@')[0] || 'Vendor';
-        setUser(prev => ({
-          ...prev,
-          id: session.user.id,
-          email: emailLower || prev.email,
-          fullName: derivedName,
-          businessName: `${derivedName} Events`,
-          avatar: derivedName.slice(0, 2).toUpperCase(),
-        }));
+        loadUserProfileFromSupabase(emailLower, session.user);
+      } else if (user.email) {
+        loadUserProfileFromSupabase(user.email);
       }
     });
 
@@ -222,15 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         setIsAuthenticated(true);
         const emailLower = (session.user.email || '').toLowerCase().trim();
-        const derivedName = session.user.user_metadata?.full_name || emailLower.split('@')[0] || 'Vendor';
-        setUser(prev => ({
-          ...prev,
-          id: session.user.id,
-          email: emailLower,
-          fullName: derivedName,
-          businessName: `${derivedName} Events`,
-          avatar: derivedName.slice(0, 2).toUpperCase(),
-        }));
+        loadUserProfileFromSupabase(emailLower, session.user);
         refreshKycStatus();
       } else if (_event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
@@ -238,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [refreshKycStatus]);
+  }, [loadUserProfileFromSupabase, refreshKycStatus, user.email]);
 
   // Instagram Username Rule Check: Max 2 changes within 14 days
   const canChangeUsername = () => {
@@ -276,6 +307,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
+    // Also persist to Supabase
+    if (user.email) {
+      supabase.from('vendor_applications').select('data').eq('email', user.email.toLowerCase().trim()).maybeSingle().then(({ data }) => {
+        const existingData = (data?.data || {}) as Record<string, any>;
+        supabase.from('vendor_applications').update({
+          data: { ...existingData, username: cleanUsername },
+          updated_at: new Date().toISOString(),
+        }).eq('email', user.email.toLowerCase().trim());
+      });
+    }
+
     return {
       success: true,
       message: `Username updated to @${cleanUsername}!`,
@@ -291,33 +333,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .filter(Boolean)
       .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ') || 'Vendor';
-    const businessName = `${derivedName} Events`;
     const username = emailPrefix.replace(/[^a-z0-9]/gi, '.').toLowerCase();
 
     setIsAuthenticated(true);
-    const newProfile: UserProfile = {
-      ...DEFAULT_USER,
-      email: emailLower,
-      fullName: derivedName,
-      businessName,
-      username,
-      avatar: derivedName.slice(0, 2).toUpperCase(),
-    };
-    setUser(newProfile);
-    localStorage.setItem('vendor_user_profile', JSON.stringify(newProfile));
     localStorage.setItem('vendor_is_authenticated', 'true');
 
-    // Make sure vendor exists in Supabase
+    // Ensure vendor row exists but do NOT overwrite existing data (ignoreDuplicates: true)
     try {
       await supabase.from('vendor_applications').upsert({
         email: emailLower,
-        business_name: businessName,
         owner_name: derivedName,
-        category: 'Event Provider',
-        location: 'Hyderabad, India',
         status: 'pending',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email', ignoreDuplicates: true });
+
+      // Always load from Supabase so saved data is restored, not overwritten
+      await loadUserProfileFromSupabase(emailLower);
     } catch (e) {}
 
     await refreshKycStatus();
@@ -327,17 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (email: string, name: string, business: string): Promise<boolean> => {
     const emailLower = email.trim().toLowerCase();
     const cleanUser = name.toLowerCase().replace(/\s+/g, '.');
-    const newProfile: UserProfile = {
-      ...DEFAULT_USER,
-      email: emailLower,
-      fullName: name,
-      businessName: business,
-      username: cleanUser,
-      avatar: name.slice(0, 2).toUpperCase() || 'VN',
-    };
     setIsAuthenticated(true);
-    setUser(newProfile);
-    localStorage.setItem('vendor_user_profile', JSON.stringify(newProfile));
     localStorage.setItem('vendor_is_authenticated', 'true');
 
     try {
@@ -345,11 +366,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         business_name: business,
         owner_name: name,
-        category: 'Event Provider',
-        location: 'Hyderabad, India',
         status: 'pending',
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
+        data: { username: cleanUser },
+      }, { onConflict: 'email', ignoreDuplicates: true });
+      await loadUserProfileFromSupabase(emailLower);
     } catch (e) {}
 
     await refreshKycStatus();
@@ -370,12 +391,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event('storage'));
   };
 
-  const updateProfile = (data: Partial<UserProfile>) => {
-    setUser(prev => {
-      const updated = { ...prev, ...data };
-      localStorage.setItem('vendor_user_profile', JSON.stringify(updated));
-      return updated;
-    });
+  const updateProfile = async (data: Partial<UserProfile>): Promise<void> => {
+    const updatedUser: UserProfile = { ...user, ...data };
+    setUser(updatedUser);
+    localStorage.setItem('vendor_user_profile', JSON.stringify(updatedUser));
+
+    const emailLower = (updatedUser.email || '').toLowerCase().trim();
+    if (!emailLower) return;
+
+    try {
+      // 1. Fetch current application data jsonb
+      const { data: existingApp } = await supabase
+        .from('vendor_applications')
+        .select('data')
+        .eq('email', emailLower)
+        .maybeSingle();
+
+      const existingData = (existingApp?.data || {}) as Record<string, any>;
+      const mergedData = {
+        ...existingData,
+        upiId: updatedUser.upiId || existingData.upiId || '',
+        bankAccount: updatedUser.bankAccount || existingData.bankAccount || '',
+        ifsc: updatedUser.ifsc || existingData.ifsc || '',
+        website: updatedUser.website || existingData.website || '',
+        bio: updatedUser.bio || existingData.bio || '',
+        username: updatedUser.username || existingData.username || '',
+      };
+
+      // 2. Persist to Supabase vendor_applications table
+      await supabase
+        .from('vendor_applications')
+        .upsert({
+          user_id: updatedUser.id && updatedUser.id.length > 20 ? updatedUser.id : undefined,
+          email: emailLower,
+          business_name: updatedUser.businessName || '',
+          owner_name: updatedUser.fullName || '',
+          category: updatedUser.category || '',
+          location: updatedUser.location || '',
+          phone: updatedUser.phone || '',
+          data: mergedData,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+
+      // 3. Persist to Supabase profiles table if user ID exists
+      if (updatedUser.id && updatedUser.id.length > 20) {
+        await supabase.from('profiles').upsert({
+          id: updatedUser.id,
+          full_name: updatedUser.fullName,
+          phone: updatedUser.phone,
+          city: updatedUser.location,
+          role: 'vendor',
+        });
+      }
+    } catch (err) {
+      console.warn('Error saving profile to Supabase:', err);
+    }
   };
 
   // Vendor submits documents directly into Supabase vendor_applications
