@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase-client';
-import { safeSetItem } from '@/lib/storageUtils';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export type KycStatus = 'unverified' | 'pending' | 'verified';
 
@@ -29,21 +28,21 @@ export interface UserProfile {
   upiId: string;
   bankAccount: string;
   ifsc: string;
-  usernameHistory: number[]; // Timestamps of username modifications
+  usernameHistory: number[];
 }
 
 const DEFAULT_USER: UserProfile = {
-  id: 'usr_default_01',
-  email: 'vendor@festivo.com',
-  fullName: 'Vendor Partner',
-  username: 'vendor.partner',
+  id: '',
+  email: '',
+  fullName: '',
+  username: '',
   website: '',
-  businessName: 'Vendor Events',
-  category: 'Event Provider',
-  phone: '+91 90000 00000',
-  location: 'Hyderabad, India',
-  bio: 'Event services provider on Festivo Platform.',
-  avatar: 'VP',
+  businessName: '',
+  category: '',
+  phone: '',
+  location: '',
+  bio: '',
+  avatar: 'VN',
   upiId: '',
   bankAccount: '',
   ifsc: '',
@@ -64,17 +63,16 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (data: Partial<UserProfile>) => void;
 
-  // Instagram Username Rules
   canChangeUsername: () => { allowed: boolean; remainingChanges: number; daysUntilReset?: number };
   changeUsername: (newUsername: string) => { success: boolean; message: string };
 
-  // Admin KYC Approval State
   kycStatus: KycStatus;
   setKycStatus: (status: KycStatus) => void;
   kycRecord: KycDocumentRecord | null;
-  submitKycDocuments: (record: Omit<KycDocumentRecord, 'submittedAt'>) => void;
-  adminApproveKyc: () => void;
-  adminRejectKyc: (reason?: string) => void;
+  submitKycDocuments: (record: Omit<KycDocumentRecord, 'submittedAt'>) => Promise<void>;
+  adminApproveKyc: () => Promise<void>;
+  adminRejectKyc: (reason?: string) => Promise<void>;
+  refreshKycStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -82,323 +80,184 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const getResolvedUserProfile = (): UserProfile => {
-    const mainUser = localStorage.getItem('festivo_user');
-    const mainProfile = localStorage.getItem('festivo_profile');
-    const saved = localStorage.getItem('vendor_user_profile');
+  const getInitialUser = (): UserProfile => {
+    try {
+      const saved = localStorage.getItem('vendor_user_profile');
+      if (saved) return { ...DEFAULT_USER, ...JSON.parse(saved) };
 
-    if (mainUser) {
-      try {
-        const userObj = JSON.parse(mainUser);
-        const emailLower = (userObj.email || '').toLowerCase().trim();
-        let profileObj: any = null;
-        if (mainProfile) {
-          try { profileObj = JSON.parse(mainProfile); } catch (e) {}
-        }
-
-        let vSavedObj: any = null;
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if ((parsed.email || '').toLowerCase().trim() === emailLower) {
-              vSavedObj = parsed;
-            }
-          } catch (e) {}
-        }
-
-        let registeredPending: any = null;
-        try {
-          const pendingRaw = localStorage.getItem('festivo_pending_vendors');
-          if (pendingRaw) {
-            const pendingList = JSON.parse(pendingRaw);
-            registeredPending = pendingList.find(
-              (v: any) => (v.details?.email || v.email || '').toLowerCase().trim() === emailLower
-            );
-          }
-        } catch (e) {}
-
-        const rawName = profileObj?.full_name?.trim() || registeredPending?.name || vSavedObj?.fullName || userObj.user_metadata?.full_name || 'Vendor';
-        const nameParts = rawName.split(' ');
-        const first = nameParts[0] || 'Vendor';
-        const last = nameParts.slice(1).join(' ') || '';
-        const initials = (first[0] + (last[0] || '')).toUpperCase();
-        const cleanUser = rawName.toLowerCase().replace(/[^a-z0-9]/g, '.');
-        const isStudio = rawName.toLowerCase().includes('studio') || rawName.toLowerCase().includes('events') || rawName.toLowerCase().includes('photography');
-        const bName = registeredPending?.name || vSavedObj?.businessName || (isStudio ? rawName : `${rawName} Events`);
-
+      const festivoUser = localStorage.getItem('festivo_user');
+      const festivoProfile = localStorage.getItem('festivo_profile');
+      if (festivoUser) {
+        const u = JSON.parse(festivoUser);
+        const p = festivoProfile ? JSON.parse(festivoProfile) : null;
+        const name = p?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Vendor';
+        const nameInitials = name.slice(0, 2).toUpperCase();
         return {
           ...DEFAULT_USER,
-          id: userObj.id || vSavedObj?.id || registeredPending?.id || 'usr_dynamic',
-          email: userObj.email || DEFAULT_USER.email,
-          fullName: rawName,
-          username: cleanUser,
-          businessName: bName,
-          category: registeredPending?.category || vSavedObj?.category || 'Event Provider',
-          location: registeredPending?.location || vSavedObj?.location || 'Hyderabad, India',
-          phone: registeredPending?.details?.phone || vSavedObj?.phone || '+91 98765 43210',
-          avatar: initials,
+          id: u.id || DEFAULT_USER.id,
+          email: u.email || DEFAULT_USER.email,
+          fullName: name,
+          businessName: `${name} Events`,
+          username: (u.email?.split('@')[0] || 'vendor').toLowerCase().replace(/[^a-z0-9]/g, '.'),
+          avatar: nameInitials,
         };
-      } catch (e) {}
-    }
-
-    if (saved) {
-      try {
-        return { ...DEFAULT_USER, ...JSON.parse(saved) };
-      } catch (e) {}
-    }
-
+      }
+    } catch (e) {}
     return DEFAULT_USER;
   };
 
-  const [user, setUser] = useState<UserProfile>(() => getResolvedUserProfile());
-
+  const [user, setUser] = useState<UserProfile>(() => getInitialUser());
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const mainUser = localStorage.getItem('festivo_user');
-    const mainProfile = localStorage.getItem('festivo_profile');
-    if (mainUser && mainProfile) {
-      try {
-        const profileObj = JSON.parse(mainProfile);
-        if (profileObj.role === 'vendor') {
-          return true;
-        }
-      } catch (e) {}
-    }
-    return localStorage.getItem('vendor_is_authenticated') === 'true';
+    return localStorage.getItem('vendor_is_authenticated') === 'true' || !!localStorage.getItem('festivo_user');
   });
 
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [isAdminModalOpen, setAdminModalOpen] = useState(false);
 
-  const resolveKycStatus = (userObj: any): KycStatus => {
-    if (!userObj) return 'unverified';
-    const emailLower = (userObj?.email || '').toLowerCase().trim();
-    if (!emailLower) return 'unverified';
+  const [kycStatus, setKycStatus] = useState<KycStatus>('unverified');
+  const [kycRecord, setKycRecord] = useState<KycDocumentRecord | null>(null);
 
-    // 1. Check if explicitly Approved by Admin
-    if (localStorage.getItem(`festivo_kyc_status_${emailLower}`) === 'Approved') return 'verified';
+  // Canonical query directly from Supabase
+  const refreshKycStatus = useCallback(async () => {
+    const currentEmail = (user.email || '').toLowerCase().trim();
+    if (!currentEmail) return;
 
-    // 2. Check festivo_approved_vendors list
-    const approvedRaw = localStorage.getItem('festivo_approved_vendors');
-    if (approvedRaw) {
-      try {
-        const approvedList = JSON.parse(approvedRaw);
-        if (Array.isArray(approvedList)) {
-          const hasApproved = approvedList.some((v: any) =>
-            (v.details?.email && v.details.email.toLowerCase().trim() === emailLower) ||
-            (v.id && userObj.id && v.id === userObj.id)
-          );
-          if (hasApproved) return 'verified';
-        }
-      } catch (e) {}
-    }
-
-    // 3. Check if explicitly Rejected
-    if (localStorage.getItem(`festivo_kyc_status_${emailLower}`) === 'Rejected') return 'unverified';
-
-    // 4. Check if KYC submitted (Pending Verification)
-    if (localStorage.getItem(`festivo_kyc_status_${emailLower}`) === 'Pending Verification') return 'pending';
-
-    // 5. Check festivo_pending_vendors for this specific vendor
-    const pendingRaw = localStorage.getItem('festivo_pending_vendors');
-    if (pendingRaw) {
-      try {
-        const pendingList = JSON.parse(pendingRaw);
-        if (Array.isArray(pendingList)) {
-          const matched = pendingList.find((v: any) =>
-            (v.details?.email && v.details.email.toLowerCase().trim() === emailLower) ||
-            (v.id && userObj.id && v.id === userObj.id)
-          );
-          if (matched) {
-            if (matched.verified === true || matched.details?.status === 'Approved') return 'verified';
-            if (matched.details?.status === 'KYC Submitted' || matched.details?.status === 'Pending Verification') {
-              // If documents were uploaded or entered in details.kyc
-              const hasDocs = matched.details?.kyc?.idNumber && matched.details.kyc.idNumber !== 'Not submitted';
-              if (hasDocs) return 'pending';
-            }
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 6. Check vendor_kyc_record for this session
-    const kRecordRaw = localStorage.getItem('vendor_kyc_record');
-    if (kRecordRaw) {
-      try {
-        const parsed = JSON.parse(kRecordRaw);
-        if (parsed && parsed.govtIdNumber && parsed.govtIdNumber !== '5482 9912 3014') {
-          return 'pending';
-        }
-      } catch (e) {}
-    }
-
-    return 'unverified';
-  };
-
-  // KYC Verification State
-  const [kycStatus, setKycStatus] = useState<KycStatus>(() => {
-    const mainUser = localStorage.getItem('vendor_user_profile') || localStorage.getItem('festivo_user');
-    let uObj = null;
-    if (mainUser) {
-      try { uObj = JSON.parse(mainUser); } catch (e) {}
-    }
-    return resolveKycStatus(uObj || user);
-  });
-
-  const [kycRecord, setKycRecord] = useState<KycDocumentRecord | null>(() => {
-    const saved = localStorage.getItem('vendor_kyc_record');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (
-          !parsed ||
-          parsed.govtIdNumber === '5482 9912 3014' ||
-          parsed.govtIdFile === 'identity_document.png' ||
-          parsed.bankProofFile === 'cancelled_cheque.png'
-        ) {
-          localStorage.removeItem('vendor_kyc_record');
-          return null;
-        }
-        return parsed;
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  });
-
-  // Cross-tab and live sync
-  useEffect(() => {
-    const syncAuthAndKyc = () => {
-      const resolvedUser = getResolvedUserProfile();
-      setUser(prev => {
-        if (
-          prev.email !== resolvedUser.email ||
-          prev.fullName !== resolvedUser.fullName ||
-          prev.businessName !== resolvedUser.businessName ||
-          prev.id !== resolvedUser.id
-        ) {
-          return resolvedUser;
-        }
-        return prev;
-      });
-
-      const mainProfile = localStorage.getItem('festivo_profile');
-      let isVendorUser = false;
-      if (mainProfile) {
-        try {
-          const profileObj = JSON.parse(mainProfile);
-          isVendorUser = profileObj.role === 'vendor';
-        } catch (e) {}
-      }
-      setIsAuthenticated(isVendorUser || localStorage.getItem('vendor_is_authenticated') === 'true');
-
-      const resolved = resolveKycStatus(resolvedUser);
-      setKycStatus(resolved);
-
-      const kRecordSaved = localStorage.getItem('vendor_kyc_record');
-      if (kRecordSaved) {
-        try {
-          const parsed = JSON.parse(kRecordSaved);
-          if (parsed && parsed.govtIdNumber !== '5482 9912 3014') {
-            setKycRecord(parsed);
-          }
-        } catch (err) {}
-      }
-    };
-
-    // 1. BroadcastChannel for zero-latency multi-tab updates
-    let channel: BroadcastChannel | null = null;
     try {
-      channel = new BroadcastChannel('festivo_auth_channel');
-      channel.onmessage = (e) => {
-        if (e.data?.type === 'KYC_STATUS_CHANGED' && e.data.status) {
-          setKycStatus(e.data.status as KycStatus);
+      const { data, error } = await supabase
+        .from('vendor_applications')
+        .select('*')
+        .eq('email', currentEmail)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Error fetching Supabase vendor application status:', error.message);
+        return;
+      }
+
+      if (data) {
+        // Map database status
+        if (data.status === 'approved') {
+          setKycStatus('verified');
+        } else if (data.status === 'kyc_submitted') {
+          setKycStatus('pending');
+        } else if (data.status === 'rejected') {
+          setKycStatus('unverified');
         } else {
-          syncAuthAndKyc();
+          // pending registration without docs submitted
+          const hasDocs = !!(data.govt_id_number || data.govt_id_file_url || data.bank_proof_file_url);
+          setKycStatus(hasDocs ? 'pending' : 'unverified');
         }
-      };
-    } catch (err) {}
 
-    // 2. Native window events
-    window.addEventListener('storage', syncAuthAndKyc);
-    window.addEventListener('focus', syncAuthAndKyc);
-    window.addEventListener('festivo_vendor_approved' as any, syncAuthAndKyc);
+        if (data.govt_id_number || data.govt_id_file_url) {
+          setKycRecord({
+            govtIdType: data.govt_id_type || 'Aadhaar Card',
+            govtIdNumber: data.govt_id_number || '',
+            govtIdFile: data.govt_id_file_url || undefined,
+            bankProofFile: data.bank_proof_file_url || undefined,
+            businessRegNumber: data.business_reg_number || undefined,
+            businessRegFile: data.business_reg_file_url || undefined,
+            submittedAt: data.kyc_submitted_at ? new Date(data.kyc_submitted_at).toLocaleDateString('en-IN') : 'Recently',
+          });
+        }
+      } else {
+        setKycStatus('unverified');
+      }
+    } catch (e) {
+      console.warn('Failed to refresh Supabase KYC status:', e);
+    }
+  }, [user.email]);
 
-    // 3. Fallback active polling every 800ms
-    const interval = setInterval(syncAuthAndKyc, 800);
+  // Sync with Supabase Auth session & setup Realtime / polling
+  useEffect(() => {
+    // 1. Initial KYC status check
+    refreshKycStatus();
+
+    // 2. Poll Supabase every 3 seconds for live approval updates across devices
+    const interval = setInterval(refreshKycStatus, 3000);
+
+    // 3. Supabase Realtime channel for instant push updates
+    const channel = supabase
+      .channel('public:vendor_applications_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vendor_applications' },
+        () => {
+          refreshKycStatus();
+        }
+      )
+      .subscribe();
+
+    // 4. Also listen to focus and storage events
+    const onFocusOrStorage = () => refreshKycStatus();
+    window.addEventListener('focus', onFocusOrStorage);
+    window.addEventListener('storage', onFocusOrStorage);
 
     return () => {
-      if (channel) channel.close();
-      window.removeEventListener('storage', syncAuthAndKyc);
-      window.removeEventListener('focus', syncAuthAndKyc);
-      window.removeEventListener('festivo_vendor_approved' as any, syncAuthAndKyc);
       clearInterval(interval);
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocusOrStorage);
+      window.removeEventListener('storage', onFocusOrStorage);
     };
-  }, []);
+  }, [refreshKycStatus]);
 
-  // Sync with Supabase Auth if configured
+  // Check Supabase active auth session on mount
   useEffect(() => {
-    if (isSupabaseConfigured()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setIsAuthenticated(true);
-          setUser(prev => ({
-            ...prev,
-            id: session.user.id,
-            email: session.user.email || prev.email,
-          }));
-        }
-      });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        const emailLower = (session.user.email || '').toLowerCase().trim();
+        const derivedName = session.user.user_metadata?.full_name || emailLower.split('@')[0] || 'Vendor';
+        setUser(prev => ({
+          ...prev,
+          id: session.user.id,
+          email: emailLower || prev.email,
+          fullName: derivedName,
+          businessName: `${derivedName} Events`,
+          avatar: derivedName.slice(0, 2).toUpperCase(),
+        }));
+      }
+    });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          setIsAuthenticated(true);
-          setUser(prev => ({
-            ...prev,
-            id: session.user.id,
-            email: session.user.email || prev.email,
-          }));
-        } else {
-          setIsAuthenticated(false);
-        }
-      });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        const emailLower = (session.user.email || '').toLowerCase().trim();
+        const derivedName = session.user.user_metadata?.full_name || emailLower.split('@')[0] || 'Vendor';
+        setUser(prev => ({
+          ...prev,
+          id: session.user.id,
+          email: emailLower,
+          fullName: derivedName,
+          businessName: `${derivedName} Events`,
+          avatar: derivedName.slice(0, 2).toUpperCase(),
+        }));
+        refreshKycStatus();
+      } else if (_event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+      }
+    });
 
-      return () => subscription.unsubscribe();
-    }
-  }, []);
+    return () => listener.subscription.unsubscribe();
+  }, [refreshKycStatus]);
 
   // Instagram Username Rule Check: Max 2 changes within 14 days
   const canChangeUsername = () => {
     const now = Date.now();
     const history = user.usernameHistory || [];
-    // Filter history to last 14 days
     const recentChanges = history.filter(timestamp => now - timestamp < FOURTEEN_DAYS_MS);
 
     if (recentChanges.length >= 2) {
       const oldestInWindow = Math.min(...recentChanges);
       const daysUntilReset = Math.ceil((FOURTEEN_DAYS_MS - (now - oldestInWindow)) / (24 * 60 * 60 * 1000));
-      return {
-        allowed: false,
-        remainingChanges: 0,
-        daysUntilReset,
-      };
+      return { allowed: false, remainingChanges: 0, daysUntilReset };
     }
-
-    return {
-      allowed: true,
-      remainingChanges: 2 - recentChanges.length,
-    };
+    return { allowed: true, remainingChanges: 2 - recentChanges.length };
   };
 
   const changeUsername = (newUsername: string): { success: boolean; message: string } => {
     const cleanUsername = newUsername.trim().toLowerCase().replace(/[^a-z0-9._]/g, '');
-    if (!cleanUsername) {
-      return { success: false, message: 'Invalid username format.' };
-    }
-
-    if (cleanUsername === user.username) {
-      return { success: true, message: 'Username is unchanged.' };
-    }
+    if (!cleanUsername) return { success: false, message: 'Invalid username format.' };
+    if (cleanUsername === user.username) return { success: true, message: 'Username is unchanged.' };
 
     const check = canChangeUsername();
     if (!check.allowed) {
@@ -411,262 +270,178 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     const updatedHistory = [...(user.usernameHistory || []), now];
 
-    setUser(prev => ({
-      ...prev,
-      username: cleanUsername,
-      usernameHistory: updatedHistory,
-    }));
+    setUser(prev => {
+      const updated = { ...prev, username: cleanUsername, usernameHistory: updatedHistory };
+      localStorage.setItem('vendor_user_profile', JSON.stringify(updated));
+      return updated;
+    });
 
     return {
       success: true,
-      message: `Username updated to @${cleanUsername}! (${2 - updatedHistory.filter(t => now - t < FOURTEEN_DAYS_MS).length} changes remaining in 14 days)`,
+      message: `Username updated to @${cleanUsername}!`,
     };
   };
 
   const login = async (email: string, _pass: string): Promise<boolean> => {
-    if (isSupabaseConfigured()) {
-      await supabase.auth.signInWithPassword({ email, password: _pass });
-    }
-
     const emailLower = email.trim().toLowerCase();
     const emailPrefix = emailLower.split('@')[0];
-    // Build readable name from email prefix: "kk" -> "Kk", "john.doe" -> "John Doe"
     const derivedName = emailPrefix
       .replace(/[._\-]/g, ' ')
       .split(' ')
       .filter(Boolean)
       .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ') || 'Vendor';
-    const isStudio = derivedName.toLowerCase().includes('studio') ||
-      derivedName.toLowerCase().includes('events') ||
-      derivedName.toLowerCase().includes('photography');
-    const businessName = isStudio ? derivedName : `${derivedName} Events`;
+    const businessName = `${derivedName} Events`;
     const username = emailPrefix.replace(/[^a-z0-9]/gi, '.').toLowerCase();
 
     setIsAuthenticated(true);
-    setUser(prev => ({
-      ...prev,
+    const newProfile: UserProfile = {
+      ...DEFAULT_USER,
       email: emailLower,
       fullName: derivedName,
       businessName,
       username,
-      avatar: derivedName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'VN',
-    }));
+      avatar: derivedName.slice(0, 2).toUpperCase(),
+    };
+    setUser(newProfile);
+    localStorage.setItem('vendor_user_profile', JSON.stringify(newProfile));
+    localStorage.setItem('vendor_is_authenticated', 'true');
 
-    // Ensure the vendor appears in Admin pending applications
+    // Make sure vendor exists in Supabase
     try {
-      const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
-      const alreadyExists = pendingList.some(
-        (v: any) => (v.details?.email || '').toLowerCase().trim() === emailLower
-      );
-      if (!alreadyExists) {
-        const vendorId = `VND-${Math.floor(100000 + Math.random() * 900000)}`;
-        const newEntry = {
-          id: vendorId,
-          name: businessName,
-          category: 'Event Provider',
-          location: 'Hyderabad, India',
-          price_amount: 25000,
-          price_label: 'Starting Package',
-          price_unit: 'event',
-          rating: 5.0,
-          reviews: 0,
-          image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-          logo: derivedName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'VN',
-          verified: false,
-          badge: 'Pending Review',
-          badge_color: 'bg-gold-500',
-          slug: username,
-          details: {
-            email: emailLower,
-            phone: '',
-            owner: derivedName,
-            address: 'Hyderabad, India',
-            registrationDate: new Date().toISOString().split('T')[0],
-            status: 'Pending Verification',
-            kyc: {
-              idNumber: 'Not submitted',
-              aadhaarFront: '',
-              cancelledCheque: '',
-            },
-          },
-        };
-        pendingList.unshift(newEntry);
-        safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
+      await supabase.from('vendor_applications').upsert({
+        email: emailLower,
+        business_name: businessName,
+        owner_name: derivedName,
+        category: 'Event Provider',
+        location: 'Hyderabad, India',
+        status: 'pending',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email', ignoreDuplicates: true });
+    } catch (e) {}
 
-        // Notify admin
-        const notifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
-        notifications.unshift({
-          id: `AN-${Math.floor(100000 + Math.random() * 900000)}`,
-          type: 'new_application',
-          vendorId,
-          vendorName: businessName,
-          message: `New vendor logged in: "${businessName}" (${emailLower}).`,
-          timestamp: new Date().toISOString(),
-          read: false,
-        });
-        localStorage.setItem('festivo_admin_notifications', JSON.stringify(notifications));
-        window.dispatchEvent(new Event('storage'));
-      }
-    } catch (e) {
-      console.warn('Could not enqueue vendor to pending list:', e);
-    }
-
+    await refreshKycStatus();
     return true;
   };
-
 
   const signup = async (email: string, name: string, business: string): Promise<boolean> => {
-    if (isSupabaseConfigured()) {
-      await supabase.auth.signUp({ email, password: 'password123' });
-    }
-    setIsAuthenticated(true);
-    setUser(prev => ({
-      ...prev,
-      email,
+    const emailLower = email.trim().toLowerCase();
+    const cleanUser = name.toLowerCase().replace(/\s+/g, '.');
+    const newProfile: UserProfile = {
+      ...DEFAULT_USER,
+      email: emailLower,
       fullName: name,
       businessName: business,
-      username: name.toLowerCase().replace(/\s+/g, '.'),
-      avatar: name.split(' ').map(n => n[0]).join('').toUpperCase() || 'VN',
-    }));
+      username: cleanUser,
+      avatar: name.slice(0, 2).toUpperCase() || 'VN',
+    };
+    setIsAuthenticated(true);
+    setUser(newProfile);
+    localStorage.setItem('vendor_user_profile', JSON.stringify(newProfile));
+    localStorage.setItem('vendor_is_authenticated', 'true');
+
+    try {
+      await supabase.from('vendor_applications').upsert({
+        email: emailLower,
+        business_name: business,
+        owner_name: name,
+        category: 'Event Provider',
+        location: 'Hyderabad, India',
+        status: 'pending',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
+    } catch (e) {}
+
+    await refreshKycStatus();
     return true;
   };
 
-  const logout = () => {
-    if (isSupabaseConfigured()) {
-      supabase.auth.signOut();
-    }
+  const logout = async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     setUser(DEFAULT_USER);
+    setKycStatus('unverified');
+    setKycRecord(null);
     localStorage.removeItem('vendor_is_authenticated');
     localStorage.removeItem('vendor_user_profile');
     localStorage.removeItem('festivo_user');
     localStorage.removeItem('festivo_profile');
-    localStorage.removeItem('vendor_kyc_record');
-    localStorage.removeItem('vendor_kyc_status');
+    localStorage.removeItem('festivo_admin_authenticated');
     window.dispatchEvent(new Event('storage'));
-    try {
-      const channel = new BroadcastChannel('festivo_auth_channel');
-      channel.postMessage({ type: 'AUTH_STATE_CHANGED', user: null });
-      channel.close();
-    } catch (e) {}
   };
-
 
   const updateProfile = (data: Partial<UserProfile>) => {
-    setUser(prev => ({ ...prev, ...data }));
+    setUser(prev => {
+      const updated = { ...prev, ...data };
+      localStorage.setItem('vendor_user_profile', JSON.stringify(updated));
+      return updated;
+    });
   };
 
-  // Vendor submits documents -> status moves to 'pending' for Admin approval
-  const submitKycDocuments = (record: Omit<KycDocumentRecord, 'submittedAt'>) => {
+  // Vendor submits documents directly into Supabase vendor_applications
+  const submitKycDocuments = async (record: Omit<KycDocumentRecord, 'submittedAt'>) => {
+    const emailLower = (user.email || '').toLowerCase().trim();
     const submittedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
     const fullRecord: KycDocumentRecord = {
       ...record,
       submittedAt: submittedDate,
     };
     setKycRecord(fullRecord);
     setKycStatus('pending');
-    localStorage.setItem('vendor_kyc_status', 'pending');
-    localStorage.setItem('vendor_kyc_record', JSON.stringify(fullRecord));
 
-    // 1. Add/update the vendor application in `festivo_pending_vendors` for Admin approval
-    const localPending = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
-    const existingIndex = localPending.findIndex((v: any) => v.details?.email?.toLowerCase() === user.email.toLowerCase());
+    try {
+      const { error } = await supabase
+        .from('vendor_applications')
+        .upsert({
+          user_id: user.id && user.id.length > 20 ? user.id : undefined,
+          email: emailLower,
+          business_name: user.businessName || `${user.fullName} Events`,
+          owner_name: user.fullName || 'Vendor',
+          category: user.category || 'Event Provider',
+          location: user.location || 'Hyderabad, India',
+          phone: user.phone || '',
+          govt_id_type: record.govtIdType || 'Aadhaar Card',
+          govt_id_number: record.govtIdNumber || '',
+          govt_id_file_url: record.govtIdFile || '',
+          bank_proof_file_url: record.bankProofFile || '',
+          business_reg_number: record.businessRegNumber || '',
+          business_reg_file_url: record.businessRegFile || '',
+          status: 'kyc_submitted',
+          kyc_submitted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
 
-    const pendingVendor = {
-      id: user.id || `VND-${Math.floor(100000 + Math.random() * 900000)}`,
-      name: user.businessName,
-      category: user.category || 'Photographer',
-      location: user.location,
-      price_amount: 48250,
-      price_label: 'Starting Package',
-      price_unit: 'day',
-      rating: 4.9,
-      reviews: 312,
-      image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-      logo: 'AS',
-      verified: false,
-      badge: 'KYC Submitted',
-      badge_color: 'bg-gold-500',
-      slug: user.username || 'aarav-photography',
-      details: {
-        email: user.email,
-        phone: user.phone || '+91 98765 43210',
-        owner: user.fullName,
-        address: user.location,
-        serviceAreas: ['Mumbai', 'Udaipur'],
-        languages: ['English', 'Hindi'],
-        teamSize: '2–5 Members',
-        experience: '3–5 Years',
-        registrationDate: new Date().toISOString().split('T')[0],
-        status: 'KYC Submitted',
-        kyc: {
-          idNumber: record.govtIdNumber,
-          aadhaarFront: record.govtIdFile || '',
-          aadhaarBack: record.govtIdFile || '',
-          pan: record.govtIdFile || '',
-          cancelledCheque: record.bankProofFile || '',
-          gst: record.businessRegFile || undefined
-        }
+      if (error) {
+        console.error('Supabase vendor_applications submit error:', error);
+        throw new Error(error.message);
       }
-    };
-
-    if (existingIndex > -1) {
-      const existingVendor = localPending[existingIndex];
-      const updatedVendor = {
-        ...existingVendor,
-        badge: 'KYC Submitted',
-        badge_color: 'bg-gold-500',
-        details: {
-          ...(existingVendor.details || {}),
-          status: 'KYC Submitted',
-          kyc: {
-            idNumber: record.govtIdNumber,
-            aadhaarFront: record.govtIdFile || '',
-            aadhaarBack: record.govtIdFile || '',
-            pan: record.govtIdFile || '',
-            cancelledCheque: record.bankProofFile || '',
-            gst: record.businessRegFile || undefined
-          }
-        }
-      };
-      localPending[existingIndex] = updatedVendor;
-    } else {
-      localPending.unshift(pendingVendor);
+    } catch (e: any) {
+      console.warn('Submission error:', e);
+      throw e;
     }
-    safeSetItem('festivo_pending_vendors', JSON.stringify(localPending));
-
-    // Also sync the specific flag read by tab 3 of AdminDashboard
-    safeSetItem(`festivo_kyc_status_${user.email.toLowerCase()}`, 'Pending Verification');
-
-    const vendorName = existingIndex > -1 ? localPending[existingIndex].name : user.businessName;
-    const vendorCategory = existingIndex > -1 ? localPending[existingIndex].category : (user.category || 'Photographer');
-    const vendorId = existingIndex > -1 ? localPending[existingIndex].id : pendingVendor.id;
-
-    // 2. Create Admin Notification
-    const notifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
-    const newNotif = {
-      id: `AN-${Math.floor(100000 + Math.random() * 900000)}`,
-      type: 'new_application',
-      vendorId: vendorId,
-      vendorName: vendorName,
-      message: `KYC documents submitted by "${vendorName}" (${vendorCategory}) for review.`,
-      timestamp: new Date().toISOString(),
-      read: false
-    };
-    localStorage.setItem('festivo_admin_notifications', JSON.stringify([newNotif, ...notifications]));
-
-    // Dispatch storage event to notify other open tabs
-    window.dispatchEvent(new Event('storage'));
   };
 
-  // Admin Portal functions
-  const adminApproveKyc = () => {
+  const adminApproveKyc = async () => {
+    const emailLower = (user.email || '').toLowerCase().trim();
     setKycStatus('verified');
+    try {
+      await supabase
+        .from('vendor_applications')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+        .eq('email', emailLower);
+    } catch (e) {}
   };
 
-  const adminRejectKyc = () => {
+  const adminRejectKyc = async () => {
+    const emailLower = (user.email || '').toLowerCase().trim();
     setKycStatus('unverified');
+    try {
+      await supabase
+        .from('vendor_applications')
+        .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+        .eq('email', emailLower);
+    } catch (e) {}
   };
 
   return (
@@ -694,6 +469,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         submitKycDocuments,
         adminApproveKyc,
         adminRejectKyc,
+        refreshKycStatus,
       }}
     >
       {children}

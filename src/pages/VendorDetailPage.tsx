@@ -10,6 +10,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
+import { fetchVendorBySlug, fetchAllVendors, fetchReviewsForVendor } from '../lib/supabase-service';
 import { dataCache } from '../lib/cache';
 import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
 
@@ -132,104 +133,23 @@ export default function VendorDetailPage() {
     if (!slug) return;
     setLoading(true);
 
-    let found: Vendor | null = null;
-    const isGloballyApproved = localStorage.getItem('vendor_kyc_status') === 'verified';
+    const loadVendorDetails = async () => {
+      const found = await fetchVendorBySlug(slug);
+      const activeVendor = found || MOCK_VENDORS.find(v => v.slug === slug) || MOCK_VENDORS[0];
+      setVendor(activeVendor);
 
-    // Helper: build vendor object preserving custom_packages
-    const buildVendorFromMatch = (match: any, defaultCategory = 'Photographer', defaultGallery?: string[]): Vendor => {
-      const isVerified = match.verified || isGloballyApproved || (match.details?.status === 'Approved');
-      const builtVendor = {
-        id: match.id || 'v_custom_01',
-        name: match.name,
-        category: match.category || defaultCategory,
-        location: match.location || 'Koramangala, Bangalore',
-        price_amount: match.price_amount || 45000,
-        price_label: match.price_label || 'Starting Package',
-        price_unit: '₹',
-        rating: match.rating || 5.0,
-        reviews: match.reviews || 1,
-        image: match.image || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-        verified: isVerified,
-        badge: isVerified ? 'Verified Partner' : 'Pending Review',
-        badge_color: isVerified ? 'bg-sage-600' : 'bg-gold-500',
-        slug: match.slug || 'vendor-partner',
-        description: match.details?.bio || match.bio || 'Verified Event Partner offering premium photography, videography, and event planning services across India.',
-        tags: [match.category || 'Event', 'Verified', 'Festivo Partner'],
-        gallery: defaultGallery || [
-          'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-          'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800',
-          'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&q=80&w=800'
-        ],
-        // CRITICAL: preserve custom_packages so the customer sees vendor-created services
-        custom_packages: match.custom_packages || null,
-      } as any;
-      return builtVendor as Vendor;
+      // Load reviews and similar vendors from Supabase
+      const [reviewData, allVendorsList] = await Promise.all([
+        fetchReviewsForVendor(slug),
+        fetchAllVendors(),
+      ]);
+
+      setReviews(reviewData as any[]);
+      setSimilarVendors((allVendorsList || []).filter(v => v.slug !== activeVendor.slug).slice(0, 4));
+      setLoading(false);
     };
 
-    // 1. Check festivo_approved_vendors first (highest priority — admin-approved)
-    const approvedRaw = localStorage.getItem('festivo_approved_vendors');
-    if (approvedRaw && !found) {
-      try {
-        const parsed = JSON.parse(approvedRaw);
-        const match = parsed.find((v: any) => v.slug === slug || v.id === slug || v.name?.toLowerCase().replace(/\s+/g, '-') === slug);
-        if (match) {
-          found = buildVendorFromMatch(match);
-        }
-      } catch (e) {}
-    }
-
-    // 2. Check festivo_pending_vendors
-    const pendingRaw = localStorage.getItem('festivo_pending_vendors');
-    const customRaw = localStorage.getItem('festivo_custom_vendors');
-
-    if (!found && pendingRaw) {
-      try {
-        const parsed = JSON.parse(pendingRaw);
-        const match = parsed.find((v: any) => v.slug === slug || v.id === slug || v.name?.toLowerCase().replace(/\s+/g, '-') === slug);
-        if (match) {
-          found = buildVendorFromMatch(match);
-        }
-      } catch (e) {}
-    }
-
-    // 3. Check festivo_custom_vendors
-    if (!found && customRaw) {
-      try {
-        const parsed = JSON.parse(customRaw);
-        const match = parsed.find((v: any) => v.slug === slug || v.id === slug || v.name?.toLowerCase().replace(/\s+/g, '-') === slug);
-        if (match) {
-          found = buildVendorFromMatch(match, 'Event Provider', [
-            'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800'
-          ]);
-        }
-      } catch (e) {}
-    }
-
-    if (!found) {
-      const allVendors = dataCache.get<Vendor[]>('all_vendors') || MOCK_VENDORS;
-      found = allVendors.find((v) => v.slug === slug) || MOCK_VENDORS.find((v) => v.slug === slug) || MOCK_VENDORS[0];
-    }
-
-    setVendor(found);
-
-    Promise.all([
-      dataCache.fetchWithCache(`reviews_${slug}`, async () => {
-        const { data } = await supabase
-          .from('reviews')
-          .select('*')
-          .order('created_at', { ascending: false });
-        return (data as Review[]) || [];
-      }),
-      dataCache.fetchWithCache('all_vendors_list', async () => {
-        const { data } = await supabase.from('vendors').select('*').limit(12);
-        return (data && data.length > 0) ? (data as Vendor[]) : MOCK_VENDORS;
-      }),
-    ]).then(([reviewData, allVendorsList]) => {
-      setReviews(reviewData);
-      const fullList = (allVendorsList && allVendorsList.length > 0) ? allVendorsList : MOCK_VENDORS;
-      setSimilarVendors(fullList.filter((v) => v.slug !== found?.slug).slice(0, 4));
-      setLoading(false);
-    });
+    loadVendorDetails();
   }, [slug]);
 
   const scrollToSection = (tab: 'projects' | 'packages' | 'areas' | 'about' | 'reviews' | 'faq', ref: React.RefObject<HTMLDivElement>) => {
@@ -563,29 +483,9 @@ export default function VendorDetailPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   {(() => {
-                    // Only use custom_packages attached to THIS specific vendor object
-                    let activeVendorPackages: any[] = [];
-                    if ((vendor as any).custom_packages && Array.isArray((vendor as any).custom_packages) && (vendor as any).custom_packages.length > 0) {
-                      activeVendorPackages = (vendor as any).custom_packages;
-                    } else {
-                      try {
-                        const vId = vendor.id || '';
-                        const vSlug = vendor.slug || '';
-                        const vEmail = ((vendor as any).details?.email || '').toLowerCase().trim();
-
-                        const pkgsById = vId ? localStorage.getItem(`vendor_packages_${vId}`) : null;
-                        const pkgsBySlug = vSlug ? localStorage.getItem(`vendor_packages_${vSlug}`) : null;
-                        const pkgsByEmail = vEmail ? localStorage.getItem(`vendor_packages_${vEmail}`) : null;
-
-                        const raw = pkgsById || pkgsBySlug || pkgsByEmail;
-                        if (raw) {
-                          const parsed = JSON.parse(raw);
-                          if (Array.isArray(parsed) && parsed.length > 0) {
-                            activeVendorPackages = parsed.filter((pkg: any) => pkg && !['1', '2', '3'].includes(String(pkg.id)));
-                          }
-                        }
-                      } catch(e) {}
-                    }
+                    const activeVendorPackages = (vendor as any).custom_packages && Array.isArray((vendor as any).custom_packages)
+                      ? (vendor as any).custom_packages
+                      : [];
 
 
                     const displayPackages = activeVendorPackages.length > 0

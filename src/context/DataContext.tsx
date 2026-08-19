@@ -1,19 +1,31 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  upcomingEvents,
-  bookingRequests,
-  scheduleItems,
-  reviews as initialReviews,
-  packages as initialPackages,
-  notifications as initialNotifications,
-  portfolioImages,
-  profileTasks as initialProfileTasks,
   type BookingStatus,
   type NotificationItem,
   type Package,
   type Review,
+  notifications as initialNotifications,
+  profileTasks as initialProfileTasks,
 } from '@/lib/dashboard-data';
-import { safeSetItem } from '@/lib/storageUtils';
+import { supabase } from '@/lib/supabase';
+import {
+  fetchPackagesForVendor,
+  createVendorPackage,
+  updateVendorPackage,
+  deleteVendorPackage,
+  fetchBookingsForVendor,
+  updateBookingStatusInDb,
+  fetchVendorCalendar,
+  addVendorCalendarEvent,
+  deleteVendorCalendarEvent,
+  fetchVendorPortfolio,
+  addVendorPortfolioItem,
+  deleteVendorPortfolioItem,
+  fetchVendorDeals,
+  addVendorDeal,
+  fetchReviewsForVendor,
+} from '@/lib/supabase-service';
+import { syncVendorToCustomerDirectory } from '@/lib/vendorSync';
 
 export interface ExtendedBooking {
   id: string;
@@ -98,182 +110,122 @@ export interface SupportTicketItem {
 }
 
 interface DataContextType {
-  // Bookings
   bookings: ExtendedBooking[];
   addBooking: (booking: Omit<ExtendedBooking, 'id'>) => void;
   updateBookingStatus: (id: string, status: BookingStatus) => void;
   deleteBooking: (id: string) => void;
 
-  // Calendar Events
   calendarEvents: CalendarEventItem[];
   addCalendarEvent: (event: Omit<CalendarEventItem, 'id'>) => void;
   deleteCalendarEvent: (id: string) => void;
 
-  // Messages
   conversations: ChatConversation[];
   activeConversationId: string;
   setActiveConversationId: (id: string) => void;
   sendMessage: (conversationId: string, text: string) => void;
   startNewConversation: (customerName: string, service: string) => void;
 
-  // Portfolio
   portfolioItems: PortfolioProject[];
   addPortfolioItem: (item: Omit<PortfolioProject, 'id' | 'views' | 'likes'>) => void;
   deletePortfolioItem: (id: string) => void;
 
-  // Packages
   packagesList: Package[];
   addPackageItem: (pkg: Omit<Package, 'id'>) => void;
   editPackageItem: (id: string, pkg: Partial<Package>) => void;
   deletePackageItem: (id: string) => void;
   togglePackagePopular: (id: string) => void;
 
-  // Reviews
   reviewsList: Review[];
   addReviewReply: (id: string, replyText: string) => void;
   addReviewItem: (rev: Omit<Review, 'id'>) => void;
 
-  // Earnings & Transactions
   transactions: TransactionItem[];
   addTransactionItem: (tx: Omit<TransactionItem, 'id'>) => void;
   timeframe: 'weekly' | 'monthly' | 'yearly';
   setTimeframe: (tf: 'weekly' | 'monthly' | 'yearly') => void;
 
-  // Deals
   dealsList: DealItem[];
   addDealItem: (deal: Omit<DealItem, 'id'>) => void;
   toggleDealStatus: (id: string) => void;
   deleteDealItem: (id: string) => void;
 
-  // Support
   supportTickets: SupportTicketItem[];
   addSupportTicket: (ticket: Omit<SupportTicketItem, 'id' | 'status' | 'date'>) => void;
 
-  // Notifications
   notificationsList: NotificationItem[];
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
   addNotification: (notif: Omit<NotificationItem, 'id' | 'unread'>) => void;
 
-  // Onboarding & Settings
-  profileTasksList: typeof initialProfileTasks;
+  profileTasksList: { id: string; label: string; done: boolean }[];
   toggleProfileTaskItem: (id: string) => void;
+
   isAvailable: boolean;
   toggleAvailability: () => void;
 
-  // Toast System
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const DEMO_NAMES = [
-  'ananya sharma', 'rohan mehta', 'priya iyer', 'karthik reddy',
-  'meera nair', 'arjun kapoor', 'sneha gupta', 'vikram singh', 'divya rao'
-];
-
-const isDemoItem = (item: any) => {
-  if (!item) return true;
-  const idStr = String(item.id || '');
-  // Only filter explicitly known demo IDs — never filter real bk_ or FEST- bookings
-  if (['c1', 'c2', 'c3', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'tx1', 'tx2', 'tx3', 'tx4', 'req_1', 'req_2', 'req_3'].includes(idStr)) return true;
-  if (idStr.startsWith('bk_') || idStr.startsWith('FEST-')) return false; // Always keep real bookings
-  const nameStr = String(item.customer || item.customerName || item.name || '').toLowerCase().trim();
-  return DEMO_NAMES.some(demo => nameStr === demo); // exact match only, not includes
-};
-
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  // --- Toast State ---
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // --- Bookings ---
-  const [bookings, setBookings] = useState<ExtendedBooking[]>(() => {
-    const saved = localStorage.getItem('vendor_bookings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((b: any) => !isDemoItem(b));
-      } catch (e) {}
-    }
-    return [];
-  });
+  const [vendorEmail, setVendorEmail] = useState<string>('');
+  const [vendorSlug, setVendorSlug] = useState<string>('');
 
   useEffect(() => {
-    // Merge-save: don't wipe real customer bookings written by BookingPage.tsx
-    // Only save if there are real bookings to write (prevents wiping on initial empty load)
-    if (bookings.length > 0) {
-      try {
-        const existing = JSON.parse(localStorage.getItem('vendor_bookings') || '[]');
-        // Merge: keep all existing, add new ones not already present
-        const existingIds = new Set(existing.map((b: any) => b.id));
-        const toAdd = bookings.filter(b => !existingIds.has(b.id));
-        const merged = [...existing, ...toAdd];
-        localStorage.setItem('vendor_bookings', JSON.stringify(merged));
-      } catch (e) {
-        localStorage.setItem('vendor_bookings', JSON.stringify(bookings));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        setVendorEmail(user.email);
+        setVendorSlug(user.email.split('@')[0]);
       }
-    }
-  }, [bookings]);
-
-  useEffect(() => {
-    const handleSync = () => {
-      const savedB = localStorage.getItem('vendor_bookings');
-      if (savedB) {
-        try {
-          const parsed = JSON.parse(savedB);
-          // Keep all real bookings (bk_*, FEST-*), filter only known demo IDs
-          const real = parsed.filter((b: any) => b && !isDemoItem(b));
-          setBookings(real);
-        } catch (e) {}
-      }
-
-      const savedCal = localStorage.getItem('vendor_calendar_events');
-      if (savedCal) setCalendarEvents(JSON.parse(savedCal).filter((e: any) => e && !['1', '2', '3', '4'].includes(String(e.id))));
-
-      const savedTx = localStorage.getItem('vendor_transactions');
-      if (savedTx) setTransactions(JSON.parse(savedTx).filter((t: any) => t && !['tx1', 'tx2', 'tx3', 'tx4'].includes(String(t.id))));
-
-      const savedNotif = localStorage.getItem('vendor_notifications');
-      if (savedNotif) setNotificationsList(JSON.parse(savedNotif).filter((n: any) => n && !['1', '2', '3', '4'].includes(String(n.id))));
-    };
-
-    window.addEventListener('storage', handleSync);
-    window.addEventListener('focus', handleSync);
-    return () => {
-      window.removeEventListener('storage', handleSync);
-      window.removeEventListener('focus', handleSync);
-    };
+    });
   }, []);
+
+  // --- Bookings ---
+  const [bookings, setBookings] = useState<ExtendedBooking[]>([]);
+
+  useEffect(() => {
+    if (!vendorEmail && !vendorSlug) return;
+    const loadVendorBookings = async () => {
+      const data = await fetchBookingsForVendor(vendorEmail || vendorSlug);
+      if (data && data.length > 0) {
+        setBookings(
+          data.map(b => ({
+            id: b.id,
+            customer: b.customer_name,
+            avatar: b.customer_name.split(' ').map(n => n[0]).join('').toUpperCase() || 'CU',
+            type: b.event_type,
+            date: b.event_date,
+            time: '10:00 AM',
+            location: 'Client Location',
+            budget: `₹${b.total_amount?.toLocaleString('en-IN')}`,
+            status: (b.status as BookingStatus) || 'confirmed',
+            notes: b.special_requests || '',
+          }))
+        );
+      }
+    };
+    loadVendorBookings();
+  }, [vendorEmail, vendorSlug]);
 
   const addBooking = (booking: Omit<ExtendedBooking, 'id'>) => {
     const newB: ExtendedBooking = { ...booking, id: 'bk_' + Date.now() };
     setBookings(prev => [newB, ...prev]);
     showToast(`Booking for ${booking.customer} created successfully!`);
-    addNotification({
-      type: 'booking',
-      title: 'New Booking Created',
-      message: `${booking.customer} - ${booking.type} on ${booking.date}`,
-      time: 'Just now',
-    });
   };
 
-  const updateBookingStatus = (id: string, status: BookingStatus) => {
-    setBookings(prev =>
-      prev.map(b => (b.id === id ? { ...b, status } : b))
-    );
+  const updateBookingStatus = async (id: string, status: BookingStatus) => {
+    setBookings(prev => prev.map(b => (b.id === id ? { ...b, status } : b)));
+    await updateBookingStatusInDb(id, status as any);
     showToast(`Booking status updated to ${status.toUpperCase()}`);
-    addNotification({
-      type: 'booking',
-      title: `Booking ${status}`,
-      message: `Status updated for booking #${id.slice(-4)}`,
-      time: 'Just now',
-    });
   };
 
   const deleteBooking = (id: string) => {
@@ -282,49 +234,44 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Calendar Events ---
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>(() => {
-    const saved = localStorage.getItem('vendor_calendar_events');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((e: any) => e && !['1', '2', '3', '4'].includes(String(e.id)));
-      } catch (err) {}
-    }
-    return [];
-  });
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('vendor_calendar_events', JSON.stringify(calendarEvents));
-  }, [calendarEvents]);
+    if (!vendorEmail) return;
+    fetchVendorCalendar(vendorEmail).then(data => {
+      if (data && data.length > 0) {
+        setCalendarEvents(
+          data.map(e => ({
+            id: e.id,
+            title: e.title,
+            time: e.time,
+            date: e.date,
+            location: e.location || '',
+            customer: e.customer || '',
+          }))
+        );
+      }
+    });
+  }, [vendorEmail]);
 
-  const addCalendarEvent = (event: Omit<CalendarEventItem, 'id'>) => {
+  const addCalendarEvent = async (event: Omit<CalendarEventItem, 'id'>) => {
     const newE: CalendarEventItem = { ...event, id: 'ev_' + Date.now() };
     setCalendarEvents(prev => [...prev, newE]);
+    if (vendorEmail) {
+      await addVendorCalendarEvent({ ...event, vendor_email: vendorEmail });
+    }
     showToast(`Event "${event.title}" added to calendar!`);
   };
 
-  const deleteCalendarEvent = (id: string) => {
+  const deleteCalendarEvent = async (id: string) => {
     setCalendarEvents(prev => prev.filter(e => e.id !== id));
+    await deleteVendorCalendarEvent(id);
     showToast('Event deleted from calendar', 'info');
   };
 
   // --- Messages & Conversations ---
-  const [conversations, setConversations] = useState<ChatConversation[]>(() => {
-    const saved = localStorage.getItem('vendor_conversations');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((c: any) => c && !['c1', 'c2', 'c3'].includes(String(c.id)));
-      } catch (err) {}
-    }
-    return [];
-  });
-
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string>('');
-
-  useEffect(() => {
-    localStorage.setItem('vendor_conversations', JSON.stringify(conversations));
-  }, [conversations]);
 
   const sendMessage = (conversationId: string, text: string) => {
     if (!text.trim()) return;
@@ -373,168 +320,151 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     };
     setConversations(prev => [newConv, ...prev]);
     setActiveConversationId(newId);
-    showToast(`Conversation started with ${customerName}`);
   };
 
   // --- Portfolio Items ---
-  const [portfolioItems, setPortfolioItems] = useState<PortfolioProject[]>(() => {
-    const saved = localStorage.getItem('vendor_portfolio_items');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((p: any) => p && !['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].includes(String(p.id)));
-      } catch (err) {}
-    }
-    return [];
-  });
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioProject[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('vendor_portfolio_items', JSON.stringify(portfolioItems));
-  }, [portfolioItems]);
+    if (!vendorEmail) return;
+    fetchVendorPortfolio(vendorEmail).then(data => {
+      if (data && data.length > 0) {
+        setPortfolioItems(
+          data.map(p => ({
+            id: p.id,
+            title: p.title,
+            category: p.category,
+            imageUrl: p.image_url,
+            description: p.description,
+            views: p.views || 1,
+            likes: p.likes || 0,
+            date: p.date || 'Recent',
+          }))
+        );
+      }
+    });
+  }, [vendorEmail]);
 
-  const addPortfolioItem = (item: Omit<PortfolioProject, 'id' | 'views' | 'likes'>) => {
+  const addPortfolioItem = async (item: Omit<PortfolioProject, 'id' | 'views' | 'likes'>) => {
     const newItem: PortfolioProject = {
       ...item,
       id: 'p_' + Date.now(),
       views: 1,
       likes: 0,
     };
-    setPortfolioItems(prev => {
-      const updated = [newItem, ...prev];
-      // Sync portfolio image URLs into the vendor's public gallery
-      try {
-        const activeUserRaw = localStorage.getItem('vendor_user_profile');
-        if (activeUserRaw) {
-          const u = JSON.parse(activeUserRaw);
-          const uEmail = (u.email || '').toLowerCase().trim();
-          const uName = (u.businessName || u.fullName || '').toLowerCase().trim();
-          if (uEmail || uName) {
-            const galleryUrls = updated.map(p => p.imageUrl).filter(Boolean);
-            const syncGallery = (listKey: string) => {
-              const raw = localStorage.getItem(listKey);
-              if (!raw) return;
-              const list = JSON.parse(raw);
-              let changed = false;
-              const synced = list.map((v: any) => {
-                const vEmail = (v.details?.email || v.email || '').toLowerCase().trim();
-                const vName = (v.name || '').toLowerCase().trim();
-                if ((uEmail && vEmail === uEmail) || (uName && vName === uName)) {
-                  changed = true;
-                  return { ...v, gallery: galleryUrls };
-                }
-                return v;
-              });
-              if (changed) localStorage.setItem(listKey, JSON.stringify(synced));
-            };
-            syncGallery('festivo_approved_vendors');
-            syncGallery('festivo_pending_vendors');
-            window.dispatchEvent(new Event('storage'));
-          }
-        }
-      } catch (e) {}
-      return updated;
-    });
+    setPortfolioItems(prev => [newItem, ...prev]);
+    if (vendorEmail) {
+      await addVendorPortfolioItem({
+        vendor_email: vendorEmail,
+        title: item.title,
+        category: item.category,
+        image_url: item.imageUrl,
+        description: item.description,
+      });
+    }
     showToast('New project added to portfolio!');
   };
 
-  const deletePortfolioItem = (id: string) => {
+  const deletePortfolioItem = async (id: string) => {
     setPortfolioItems(prev => prev.filter(p => p.id !== id));
+    await deleteVendorPortfolioItem(id);
     showToast('Portfolio item deleted', 'info');
   };
 
   // --- Packages ---
-  const [packagesList, setPackagesList] = useState<Package[]>(() => {
-    const saved = localStorage.getItem('vendor_packages');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((pkg: any) => pkg && !['1', '2', '3'].includes(String(pkg.id)));
-      } catch (err) {}
-    }
-    return [];
-  });
+  const [packagesList, setPackagesList] = useState<Package[]>([]);
 
   useEffect(() => {
-    const activeUserRaw = localStorage.getItem('vendor_user_profile');
-    if (activeUserRaw) {
-      try {
-        const u = JSON.parse(activeUserRaw);
-        const uEmail = (u.email || '').toLowerCase().trim();
-        const uName = (u.businessName || u.fullName || '').toLowerCase().trim();
-        const uSlug = (u.username || u.slug || '').toLowerCase().trim();
+    if (!vendorSlug && !vendorEmail) return;
+    fetchPackagesForVendor(vendorSlug, vendorEmail).then(pkgs => {
+      if (pkgs && pkgs.length > 0) {
+        setPackagesList(
+          pkgs.map(p => ({
+            id: p.id || 'pkg_' + Date.now(),
+            name: p.name,
+            category: p.category,
+            packageType: p.package_type || 'Standard',
+            price: p.price,
+            shortDescription: p.short_description,
+            detailedDescription: p.detailed_description,
+            coverImage: p.cover_image,
+            galleryImages: p.gallery_images,
+            services: p.services,
+            popular: p.popular,
+          }))
+        );
+      }
+    });
+  }, [vendorSlug, vendorEmail]);
 
-        if (uEmail) safeSetItem(`vendor_packages_${uEmail}`, JSON.stringify(packagesList));
-        if (uSlug) safeSetItem(`vendor_packages_${uSlug}`, JSON.stringify(packagesList));
-        if (u.id) safeSetItem(`vendor_packages_${u.id}`, JSON.stringify(packagesList));
-
-        // Only sync if we have a real email, name, or slug to match against
-        if (!uEmail && !uName && !uSlug) return;
-
-        const syncVendorList = (listKey: string) => {
-          const raw = localStorage.getItem(listKey);
-          if (!raw) return;
-          const list = JSON.parse(raw);
-          let changed = false;
-          const updated = list.map((v: any) => {
-            const vEmail = (v.details?.email || v.email || '').toLowerCase().trim();
-            const vName = (v.name || '').toLowerCase().trim();
-            const vSlug = (v.slug || '').toLowerCase().trim();
-            const isMatch = (uEmail && vEmail === uEmail) || (uName && vName === uName) || (uSlug && vSlug === uSlug);
-            if (isMatch) {
-              changed = true;
-              return { ...v, custom_packages: packagesList };
-            }
-            return v;
-          });
-          if (changed) safeSetItem(listKey, JSON.stringify(updated));
-        };
-
-        syncVendorList('festivo_approved_vendors');
-        syncVendorList('festivo_pending_vendors');
-        syncVendorList('festivo_custom_vendors');
-      } catch (e) {}
-    } else {
-      safeSetItem('vendor_packages', JSON.stringify(packagesList));
-    }
-    window.dispatchEvent(new Event('storage'));
-  }, [packagesList]);
-
-  const addPackageItem = (pkg: Omit<Package, 'id'>) => {
+  const addPackageItem = async (pkg: Omit<Package, 'id'>) => {
     const newPkg: Package = { ...pkg, id: 'pkg_' + Date.now() };
     setPackagesList(prev => [...prev, newPkg]);
-    showToast(`Package "${pkg.name}" added!`);
+
+    await createVendorPackage({
+      vendor_email: vendorEmail,
+      vendor_slug: vendorSlug,
+      name: pkg.name,
+      category: pkg.category,
+      package_type: pkg.packageType,
+      price: pkg.price,
+      short_description: pkg.shortDescription,
+      detailed_description: pkg.detailedDescription,
+      cover_image: pkg.coverImage,
+      gallery_images: pkg.galleryImages,
+      services: pkg.services,
+      popular: pkg.popular,
+    });
+
+    syncVendorToCustomerDirectory([...packagesList, newPkg] as any[]);
+    showToast(`Package "${pkg.name}" created and published to Supabase!`, 'success');
   };
 
-  const editPackageItem = (id: string, updated: Partial<Package>) => {
+  const editPackageItem = async (id: string, updated: Partial<Package>) => {
     setPackagesList(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
-    showToast('Package updated successfully!');
+    await updateVendorPackage(id, updated as any);
+    showToast('Package updated successfully in Supabase!', 'success');
   };
 
-  const deletePackageItem = (id: string) => {
+  const deletePackageItem = async (id: string) => {
     setPackagesList(prev => prev.filter(p => p.id !== id));
-    showToast('Package removed', 'info');
+    await deleteVendorPackage(id);
+    showToast('Package removed from Supabase', 'info');
   };
 
-  const togglePackagePopular = (id: string) => {
-    setPackagesList(prev => prev.map(p => (p.id === id ? { ...p, popular: !p.popular } : p)));
-    showToast('Popular tag updated');
+  const togglePackagePopular = async (id: string) => {
+    const pkg = packagesList.find(p => p.id === id);
+    if (pkg) {
+      const next = !pkg.popular;
+      setPackagesList(prev => prev.map(p => (p.id === id ? { ...p, popular: next } : p)));
+      await updateVendorPackage(id, { popular: next });
+      showToast('Popular tier tag updated');
+    }
   };
 
   // --- Reviews ---
-  const [reviewsList, setReviewsList] = useState<Review[]>(() => {
-    const saved = localStorage.getItem('vendor_reviews');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((r: any) => r && !['1', '2', '3'].includes(String(r.id)));
-      } catch (err) {}
-    }
-    return [];
-  });
+  const [reviewsList, setReviewsList] = useState<Review[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('vendor_reviews', JSON.stringify(reviewsList));
-  }, [reviewsList]);
+    if (!vendorSlug) return;
+    fetchReviewsForVendor(vendorSlug).then(data => {
+      if (data && data.length > 0) {
+        setReviewsList(
+          data.map(r => ({
+            id: r.id,
+            author: r.customer_name,
+            customer: r.customer_name,
+            rating: r.rating,
+            comment: r.comment,
+            date: r.date || 'Recent',
+            service: 'Event Service',
+            avatar: r.customer_name.split(' ').map(n => n[0]).join('').toUpperCase() || 'CU',
+            reply: r.vendor_reply,
+          }))
+        );
+      }
+    });
+  }, [vendorSlug]);
 
   const addReviewReply = (id: string, replyText: string) => {
     setReviewsList(prev =>
@@ -550,22 +480,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Earnings & Transactions ---
-  const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
-    const saved = localStorage.getItem('vendor_transactions');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((t: any) => t && !['tx1', 'tx2', 'tx3', 'tx4'].includes(String(t.id)));
-      } catch (err) {}
-    }
-    return [];
-  });
-
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
-
-  useEffect(() => {
-    localStorage.setItem('vendor_transactions', JSON.stringify(transactions));
-  }, [transactions]);
 
   const addTransactionItem = (tx: Omit<TransactionItem, 'id'>) => {
     const newTx: TransactionItem = { ...tx, id: 'tx_' + Date.now() };
@@ -574,19 +490,39 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Deals ---
-  const [dealsList, setDealsList] = useState<DealItem[]>(() => {
-    const saved = localStorage.getItem('vendor_deals');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
+  const [dealsList, setDealsList] = useState<DealItem[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('vendor_deals', JSON.stringify(dealsList));
-  }, [dealsList]);
+    if (!vendorEmail) return;
+    fetchVendorDeals(vendorEmail).then(data => {
+      if (data && data.length > 0) {
+        setDealsList(
+          data.map(d => ({
+            id: d.id,
+            code: d.code,
+            discount: d.discount,
+            validTill: d.valid_till,
+            packageName: d.package_name,
+            status: d.status,
+          }))
+        );
+      }
+    });
+  }, [vendorEmail]);
 
-  const addDealItem = (deal: Omit<DealItem, 'id'>) => {
+  const addDealItem = async (deal: Omit<DealItem, 'id'>) => {
     const newD: DealItem = { ...deal, id: 'd_' + Date.now() };
     setDealsList(prev => [newD, ...prev]);
+    if (vendorEmail) {
+      await addVendorDeal({
+        vendor_email: vendorEmail,
+        code: deal.code,
+        discount: deal.discount,
+        valid_till: deal.validTill,
+        package_name: deal.packageName,
+        status: deal.status,
+      });
+    }
     showToast(`Promo Deal "${deal.code}" created!`);
   };
 
@@ -603,15 +539,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Support Tickets ---
-  const [supportTickets, setSupportTickets] = useState<SupportTicketItem[]>(() => {
-    const saved = localStorage.getItem('vendor_support_tickets');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('vendor_support_tickets', JSON.stringify(supportTickets));
-  }, [supportTickets]);
+  const [supportTickets, setSupportTickets] = useState<SupportTicketItem[]>([]);
 
   const addSupportTicket = (ticket: Omit<SupportTicketItem, 'id' | 'status' | 'date'>) => {
     const newT: SupportTicketItem = {
@@ -625,15 +553,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Notifications ---
-  const [notificationsList, setNotificationsList] = useState<NotificationItem[]>(() => {
-    const saved = localStorage.getItem('vendor_notifications');
-    if (saved) return JSON.parse(saved);
-    return initialNotifications;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('vendor_notifications', JSON.stringify(notificationsList));
-  }, [notificationsList]);
+  const [notificationsList, setNotificationsList] = useState<NotificationItem[]>(initialNotifications);
 
   const markNotificationRead = (id: string) => {
     setNotificationsList(prev =>
@@ -661,15 +581,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Profile Onboarding Tasks ---
-  const [profileTasksList, setProfileTasksList] = useState(() => {
-    const saved = localStorage.getItem('vendor_profile_tasks');
-    if (saved) return JSON.parse(saved);
-    return initialProfileTasks;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('vendor_profile_tasks', JSON.stringify(profileTasksList));
-  }, [profileTasksList]);
+  const [profileTasksList, setProfileTasksList] = useState(initialProfileTasks);
 
   const toggleProfileTaskItem = (id: string) => {
     setProfileTasksList((prev: typeof initialProfileTasks) =>
@@ -678,14 +590,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   // --- Vendor Availability ---
-  const [isAvailable, setIsAvailable] = useState<boolean>(() => {
-    return localStorage.getItem('vendor_availability') !== 'false';
-  });
+  const [isAvailable, setIsAvailable] = useState<boolean>(true);
 
   const toggleAvailability = () => {
     setIsAvailable(prev => {
       const next = !prev;
-      localStorage.setItem('vendor_availability', String(next));
       showToast(next ? 'Status set to Accepting Bookings' : 'Status set to Away / Pause Bookings', next ? 'success' : 'info');
       return next;
     });

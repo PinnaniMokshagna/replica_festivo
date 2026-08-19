@@ -375,7 +375,19 @@ export default function VendorRegistrationPage() {
           },
           { onConflict: 'user_id' }
         );
-        if (vendorProfileErr) console.error('Supabase vendor_profiles insert error:', vendorProfileErr);
+        await supabase.from('vendor_applications').upsert(
+          {
+            email: businessEmail.toLowerCase().trim(),
+            business_name: businessName,
+            owner_name: ownerName,
+            category: category,
+            location: `${city}, India`,
+            phone: businessPhone,
+            status: 'pending',
+            data: newVendor,
+          },
+          { onConflict: 'email' }
+        );
       } catch (err) {
         console.warn('Auth / Profile insert failed:', err);
       }

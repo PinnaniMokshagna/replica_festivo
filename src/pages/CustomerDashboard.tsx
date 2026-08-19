@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase, type Booking, type Vendor } from '../lib/supabase';
+import { fetchBookingsForCustomer, createReviewInDb } from '../lib/supabase-service';
 import { MOCK_VENDORS } from '../lib/vendors';
 import { useSavedVendors } from '../lib/savedVendors';
 import { useUserAvatar } from '../lib/userAvatar';
@@ -103,54 +104,24 @@ export default function CustomerDashboard() {
     const loadBookings = async () => {
       setLoading(true);
       const userEmail = (user.email || '').trim().toLowerCase();
-      let userBookings: BookingWithVendor[] = [];
-
-      // 1. Fetch real bookings from Supabase database for this user's email
-      try {
-        const { data: dbBookings } = await supabase
-          .from('bookings')
-          .select('*, vendor:vendors(*)')
-          .eq('customer_email', userEmail);
-
-        if (dbBookings && dbBookings.length > 0) {
-          userBookings = dbBookings.map((b: any) => ({
-            ...b,
-            vendor: Array.isArray(b.vendor) ? b.vendor[0] : b.vendor
-          }));
-        }
-      } catch (e) {
-        console.warn('Could not fetch DB bookings:', e);
-      }
-
-      // 2. Fetch local storage bookings matching user's email (excluding sample demo receipts unless email matches)
-      const savedCustomerBookings = localStorage.getItem('festivo_customer_bookings');
-      if (savedCustomerBookings) {
-        try {
-          const parsed = JSON.parse(savedCustomerBookings);
-          if (Array.isArray(parsed)) {
-            const userLocal = parsed.filter((b: any) => {
-              const emailMatch = (b.customer_email || '').trim().toLowerCase() === userEmail;
-              const isSampleDemo = b.customer_email === 'kranti@festivo.com' || (b.id && String(b.id).startsWith('rec-'));
-              return emailMatch && (!isSampleDemo || userEmail === 'kranti@festivo.com');
-            });
-            userLocal.forEach((b: any) => {
-              if (!userBookings.some(existing => existing.id === b.id || existing.booking_ref === b.booking_ref)) {
-                userBookings.push(b);
-              }
-            });
-          }
-        } catch (e) {
-          console.warn('Error parsing customer bookings:', e);
-        }
-      }
-
+      const userBookings = await fetchBookingsForCustomer(userEmail);
       setBookings(userBookings);
       setLoading(false);
     };
 
     loadBookings();
-    window.addEventListener('storage', loadBookings);
-    return () => window.removeEventListener('storage', loadBookings);
+
+    // Subscribe to realtime booking updates for this user
+    const channel = supabase
+      .channel(`customer-bookings-${user.id || user.email}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+        loadBookings();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   // Interactive Live Chat & Call Handlers
@@ -244,20 +215,17 @@ export default function CustomerDashboard() {
 
   const submitReview = async (booking: Booking) => {
     setReviewSubmitting(true);
-    // Save review to localStorage
     try {
-      const existingReviews = JSON.parse(localStorage.getItem('festivo_customer_reviews') || '[]');
-      const newReview = {
-        id: 'rev_' + Date.now(),
+      await createReviewInDb({
         vendor_id: booking.vendor_id,
+        booking_id: booking.id,
         customer_name: booking.customer_name,
+        customer_email: booking.customer_email,
         rating: reviewRating,
         comment: reviewComment,
-        created_at: new Date().toISOString(),
-      };
-      localStorage.setItem('festivo_customer_reviews', JSON.stringify([newReview, ...existingReviews]));
+      });
     } catch (e) {
-      console.warn('Could not save review to localStorage:', e);
+      console.warn('Could not save review to Supabase:', e);
     }
     setReviewSubmitting(false);
     setReviewingBooking(null);
@@ -1096,27 +1064,23 @@ export default function CustomerDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setProfileSaving(true);
                     setAvatar(avatarInput ? avatarInput.trim() : null);
-                    // Save profile to localStorage (no Supabase)
                     try {
-                      const savedProfile = JSON.parse(localStorage.getItem('festivo_profile') || '{}');
-                      const updatedProfile = { ...savedProfile, full_name: editName, phone: editPhone };
-                      localStorage.setItem('festivo_profile', JSON.stringify(updatedProfile));
-
-                      const savedUser = JSON.parse(localStorage.getItem('festivo_user') || '{}');
-                      const updatedUser = { ...savedUser, user_metadata: { ...savedUser.user_metadata, full_name: editName } };
-                      localStorage.setItem('festivo_user', JSON.stringify(updatedUser));
+                      if (user?.id) {
+                        await supabase.from('profiles').upsert({
+                          id: user.id,
+                          full_name: editName,
+                          phone: editPhone,
+                          avatar_url: avatarInput ? avatarInput.trim() : null,
+                        });
+                      }
                     } catch (e) {
-                      console.warn('Could not save profile to localStorage:', e);
+                      console.warn('Could not save profile to Supabase:', e);
                     }
-                    setTimeout(() => {
-                      setProfileSaving(false);
-                      setShowProfileModal(false);
-                      // Reload the page to reflect updated profile from localStorage
-                      window.location.reload();
-                    }, 300);
+                    setProfileSaving(false);
+                    setShowProfileModal(false);
                   }}
                   className="px-5 py-2 bg-gradient-brand text-white font-bold rounded-xl text-xs hover:shadow-glow transition-all flex items-center gap-1.5"
                 >

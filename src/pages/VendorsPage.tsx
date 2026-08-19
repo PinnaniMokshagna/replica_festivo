@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
+import { fetchAllVendors } from '../lib/supabase-service';
 import { dataCache } from '../lib/cache';
 import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
 
@@ -140,164 +141,85 @@ export default function VendorsPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    const loadMergedVendors = () => {
-      let baseList = [...MOCK_VENDORS];
-
-      const approvedRaw = localStorage.getItem('festivo_approved_vendors');
-      const pendingRaw = localStorage.getItem('festivo_pending_vendors');
-      const customRaw = localStorage.getItem('festivo_custom_vendors');
-
-      const extraVendors: Vendor[] = [];
-      const seenIds = new Set<string>();
-
-      // 1. Check festivo_approved_vendors FIRST (admin-approved, highest priority)
-      if (approvedRaw) {
-        try {
-          const parsed = JSON.parse(approvedRaw);
-          parsed.forEach((item: any) => {
-            if (!item.id || seenIds.has(item.id)) return;
-            seenIds.add(item.id);
-            extraVendors.push({
-              id: item.id,
-              name: item.name,
-              category: item.category || 'Event Provider',
-              location: item.location || 'Hyderabad, India',
-              price_amount: item.price_amount || 45000,
-              price_label: item.price_label || 'Starting Package',
-              price_unit: '₹',
-              rating: item.rating || 5.0,
-              reviews: item.reviews || 1,
-              image: item.image || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-              verified: true,
-              badge: 'Verified Partner',
-              badge_color: 'bg-sage-600',
-              slug: item.slug || item.name?.toLowerCase().replace(/\s+/g, '-'),
-              description: item.details?.bio || 'Verified Event Partner offering premium services.',
-              tags: item.tags || [item.category || 'Event', 'Verified', 'Festivo Partner'],
-              gallery: item.gallery || [
-                'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-              ]
-            } as Vendor);
-          });
-        } catch (e) {}
-      }
-
-      // 2. Also check festivo_pending_vendors for any additionally approved ones
-      if (pendingRaw) {
-        try {
-          const parsed = JSON.parse(pendingRaw);
-          parsed.forEach((item: any) => {
-            if (!item.id || seenIds.has(item.id)) return;
-            const vEmail = (item.details?.email || '').toLowerCase().trim();
-            const specStatus = vEmail ? localStorage.getItem(`festivo_kyc_status_${vEmail}`) : null;
-            const isApproved = item.verified === true || item.details?.status === 'Approved' || specStatus === 'Approved';
-
-            if (isApproved) {
-              seenIds.add(item.id);
-              extraVendors.push({
-                id: item.id || 'v_custom_01',
-                name: item.name,
-                category: item.category || 'Photographer',
-                location: item.location || 'Koramangala, Bangalore',
-                price_amount: item.price_amount || 45000,
-                price_label: item.price_label || 'Starting Package',
-                price_unit: '₹',
-                rating: item.rating || 5.0,
-                reviews: item.reviews || 1,
-                image: item.image || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-                verified: true,
-                badge: 'Verified Partner',
-                badge_color: 'bg-sage-600',
-                slug: item.slug || 'vendor-partner',
-                description: item.details?.bio || 'Verified Event Partner offering premium services.',
-                tags: item.tags || [item.category || 'Event', 'Verified', 'Festivo Partner'],
-                gallery: item.gallery || [
-                  'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-                  'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800'
-                ]
-              } as Vendor);
-            }
-          });
-        } catch (e) {}
-      }
-
-      // 3. Check festivo_custom_vendors
-      if (customRaw) {
-        try {
-          const parsed = JSON.parse(customRaw);
-          parsed.forEach((item: any) => {
-            if (!item.id || seenIds.has(item.id)) return;
-            const vEmail = (item.details?.email || '').toLowerCase().trim();
-            const specStatus = vEmail ? localStorage.getItem(`festivo_kyc_status_${vEmail}`) : null;
-            const isApproved = item.verified === true || item.details?.status === 'Approved' || specStatus === 'Approved';
-
-            if (isApproved) {
-              seenIds.add(item.id);
-              extraVendors.push({
-                id: item.id,
-                name: item.name,
-                category: item.category || 'Event Provider',
-                location: item.location || 'Koramangala, Bangalore',
-                price_amount: item.price_amount || 45000,
-                price_label: item.price_label || 'Starting Package',
-                price_unit: '₹',
-                rating: item.rating || 5.0,
-                reviews: item.reviews || 1,
-                image: item.image || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-                verified: true,
-                badge: 'Verified Partner',
-                badge_color: 'bg-sage-600',
-                slug: item.slug || 'vendor-partner',
-                description: item.bio || 'Verified Event Partner offering premium services.',
-                tags: item.tags || [item.category || 'Event', 'Verified'],
-                gallery: item.gallery || [
-                  'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800'
-                ]
-              } as Vendor);
-            }
-          });
-        } catch (e) {}
-      }
-
-      extraVendors.forEach(extra => {
-        const idx = baseList.findIndex(v => v.id === extra.id || v.name.toLowerCase() === extra.name.toLowerCase() || v.slug === extra.slug);
-        if (idx >= 0) {
-          baseList[idx] = { ...baseList[idx], ...extra };
-        } else {
-          baseList.unshift(extra);
-        }
-      });
-
-      setVendors(baseList);
+    const loadMergedVendors = async () => {
+      setLoading(true);
+      const data = await fetchAllVendors();
+      setVendors(data);
       setLoading(false);
     };
 
     loadMergedVendors();
-    window.addEventListener('storage', loadMergedVendors);
-    window.addEventListener('focus', loadMergedVendors);
+
+    // Listen for realtime Supabase updates
+    const channel = supabase
+      .channel('vendors-public-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
+        loadMergedVendors();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_packages' }, () => {
+        loadMergedVendors();
+      })
+      .subscribe();
+
     return () => {
-      window.removeEventListener('storage', loadMergedVendors);
-      window.removeEventListener('focus', loadMergedVendors);
+      supabase.removeChannel(channel);
     };
   }, []);
 
   const filtered = useMemo(() => {
     let list = [...vendors];
-    if (search) list = list.filter(v => v.name.toLowerCase().includes(search.toLowerCase()) || v.location.toLowerCase().includes(search.toLowerCase()) || v.category.toLowerCase().includes(search.toLowerCase()));
+
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter(v => 
+        v.name.toLowerCase().includes(s) || 
+        v.location.toLowerCase().includes(s) || 
+        v.category.toLowerCase().includes(s) ||
+        (v.tags && v.tags.some(t => t.toLowerCase().includes(s))) ||
+        ((v as any).custom_packages && (v as any).custom_packages.some((p: any) => (p.name || '').toLowerCase().includes(s) || (p.category || '').toLowerCase().includes(s)))
+      );
+    }
+
     if (activeCategory !== 'All') {
+      const aCat = activeCategory.toLowerCase().trim();
       list = list.filter(v => {
         const vCat = (v.category || '').toLowerCase().trim();
-        const aCat = activeCategory.toLowerCase().trim();
-        if (vCat === aCat) return true;
+        if (vCat === aCat || vCat.includes(aCat) || aCat.includes(vCat)) return true;
+
+        // Semantic aliases
+        if ((aCat.includes('dj') || aCat.includes('music')) && (vCat.includes('dj') || vCat.includes('music'))) return true;
         if ((aCat.includes('makeup') || aCat.includes('beauty')) && (vCat.includes('makeup') || vCat.includes('beauty'))) return true;
         if ((aCat.includes('photo') || aCat.includes('video')) && (vCat.includes('photo') || vCat.includes('video'))) return true;
         if (aCat.includes('cater') && vCat.includes('cater')) return true;
         if (aCat.includes('decor') && vCat.includes('decor')) return true;
         if (aCat.includes('venue') && vCat.includes('venue')) return true;
-        if (aCat.includes('music') && vCat.includes('music')) return true;
-        return vCat.includes(aCat) || aCat.includes(vCat);
+
+        // Match tags
+        if (v.tags && v.tags.some(t => t.toLowerCase().includes(aCat) || aCat.includes(t.toLowerCase()))) return true;
+
+        // Match custom package categories created by the vendor
+        if ((v as any).custom_packages && Array.isArray((v as any).custom_packages)) {
+          if ((v as any).custom_packages.some((p: any) => (p.category || '').toLowerCase().includes(aCat) || (p.name || '').toLowerCase().includes(aCat))) {
+            return true;
+          }
+        }
+
+        // Check stored packages for this vendor
+        const vSlug = v.slug || '';
+        const rawPkgs = vSlug ? localStorage.getItem(`vendor_packages_${vSlug}`) : null;
+        if (rawPkgs) {
+          try {
+            const parsed = JSON.parse(rawPkgs);
+            if (Array.isArray(parsed) && parsed.some((p: any) => (p.category || '').toLowerCase().includes(aCat) || (p.name || '').toLowerCase().includes(aCat))) {
+              return true;
+            }
+          } catch(e) {}
+        }
+
+        return false;
       });
     }
+
     const range = PRICE_RANGES[priceRange];
     list = list.filter(v => v.price_amount >= range.min && v.price_amount <= range.max);
     if (sortBy === 'rating') list.sort((a, b) => b.rating - a.rating);

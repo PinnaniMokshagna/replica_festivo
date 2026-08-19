@@ -10,6 +10,7 @@ import Footer from '../components/Footer';
 import { useInView } from '../hooks/useInView';
 import { CATEGORIES } from '../lib/categories';
 import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
+import { fetchAllVendors } from '../lib/supabase-service';
 
 export default function ExplorePage() {
   const navigate = useNavigate();
@@ -34,53 +35,14 @@ export default function ExplorePage() {
   }, []);
 
   useEffect(() => {
-    const loadFeaturedVendors = () => {
-      // Start with top 6 mock vendors
-      let baseList = [...MOCK_VENDORS];
-
-      // Merge in any admin-approved registered vendors (same logic as VendorsPage)
-      const approvedRaw = localStorage.getItem('festivo_approved_vendors');
-      if (approvedRaw) {
-        try {
-          const parsed = JSON.parse(approvedRaw);
-          const seenIds = new Set(baseList.map(v => v.id));
-          parsed.forEach((item: any) => {
-            if (!item.id || seenIds.has(item.id)) return;
-            seenIds.add(item.id);
-            baseList.unshift({
-              id: item.id,
-              name: item.name,
-              category: item.category || 'Event Provider',
-              location: item.location || 'Koramangala, Bangalore',
-              price_amount: item.price_amount || 45000,
-              price_label: item.price_label || 'Starting Package',
-              price_unit: '₹',
-              rating: item.rating || 5.0,
-              reviews: item.reviews || 1,
-              image: item.image || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-              verified: true,
-              badge: 'Verified Partner',
-              badge_color: 'bg-sage-600',
-              slug: item.slug || item.name?.toLowerCase().replace(/\s+/g, '-'),
-              description: item.details?.bio || 'Verified Event Partner offering premium services.',
-              tags: item.tags || [item.category || 'Event', 'Verified', 'Festivo Partner'],
-              gallery: item.gallery || ['https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800'],
-            } as any);
-          });
-        } catch (e) {}
-      }
-
-      setVendors(baseList.slice(0, 6));
+    const loadFeaturedVendors = async () => {
+      setLoading(true);
+      const all = await fetchAllVendors();
+      setVendors(all.slice(0, 6));
       setLoading(false);
     };
 
     loadFeaturedVendors();
-    window.addEventListener('storage', loadFeaturedVendors);
-    window.addEventListener('focus', loadFeaturedVendors);
-    return () => {
-      window.removeEventListener('storage', loadFeaturedVendors);
-      window.removeEventListener('focus', loadFeaturedVendors);
-    };
   }, []);
 
   return (

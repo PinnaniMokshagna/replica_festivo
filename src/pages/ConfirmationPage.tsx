@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
 import type { Booking, Vendor } from '../lib/supabase';
+import { fetchBookingByRef } from '../lib/supabase-service';
 
 function Confetti() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,63 +76,13 @@ export default function ConfirmationPage() {
   useEffect(() => {
     if (!ref) return;
 
-    // First check localStorage (for locally-booked vendors)
-    const checkLocalStorage = () => {
-      try {
-        const customerBookings = JSON.parse(localStorage.getItem('festivo_customer_bookings') || '[]');
-        const found = customerBookings.find((b: any) => b.booking_ref === ref || b.id === ref);
-        if (found) {
-          setBooking(found as Booking);
-          // Build a minimal vendor object from the booking data
-          setVendor({
-            id: found.vendor_id,
-            name: found.vendor_name || 'Event Vendor',
-            category: found.vendor_category || 'Event',
-            location: found.location || 'Koramangala, Bangalore',
-            price_amount: found.total_amount || 45000,
-            price_label: 'Booking Total',
-            price_unit: '₹',
-            rating: 5.0,
-            reviews: 1,
-            image: '',
-            verified: true,
-            badge: 'Verified Partner',
-            badge_color: 'bg-sage-600',
-            slug: found.vendor_slug || '',
-            description: '',
-            tags: [],
-            gallery: [],
-          } as Vendor);
-          setLoading(false);
-          return true;
-        }
-      } catch (e) {}
-      return false;
-    };
-
-    if (checkLocalStorage()) {
-      const timer = setTimeout(() => setShowConfetti(false), 5000);
-      return () => clearTimeout(timer);
-    }
-
-    // Fallback to Supabase
-    supabase
-      .from('bookings')
-      .select('*')
-      .eq('booking_ref', ref)
-      .maybeSingle()
-      .then(async ({ data: bookingData }) => {
-        if (bookingData) {
-          setBooking(bookingData);
-          const { data: vendorData } = await supabase
-            .from('vendors')
-            .select('*')
-            .eq('id', bookingData.vendor_id)
-            .maybeSingle();
-          setVendor(vendorData);
-        }
-        setLoading(false);
-      });
+    fetchBookingByRef(ref).then((bookingData) => {
+      if (bookingData) {
+        setBooking(bookingData);
+        setVendor(bookingData.vendor || null);
+      }
+      setLoading(false);
+    });
 
     const timer = setTimeout(() => setShowConfetti(false), 5000);
     return () => clearTimeout(timer);

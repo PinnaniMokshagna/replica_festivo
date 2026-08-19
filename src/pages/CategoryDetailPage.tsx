@@ -9,6 +9,7 @@ import Footer from '../components/Footer';
 import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
+import { fetchAllVendors } from '../lib/supabase-service';
 import { getCategory, CATEGORIES } from '../lib/categories';
 import { dataCache } from '../lib/cache';
 import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
@@ -33,47 +34,58 @@ export default function CategoryDetailPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const isCategoryMatch = (vCategory: string, catLabel: string) => {
-      if (!vCategory || !catLabel) return false;
-      const v = (vCategory || '').toLowerCase().trim();
-      const c = (catLabel || '').toLowerCase().trim();
-      if (v === c) return true;
-      if ((c.includes('makeup') || c.includes('beauty')) && (v.includes('makeup') || v.includes('beauty'))) return true;
-      if ((c.includes('photo') || c.includes('video') || c.includes('camera')) && (v.includes('photo') || v.includes('video') || v.includes('camera'))) return true;
-      if (c.includes('cater') && v.includes('cater')) return true;
-      if (c.includes('decor') && v.includes('decor')) return true;
-      if (c.includes('venue') && v.includes('venue')) return true;
-      if (c.includes('music') && v.includes('music')) return true;
-      return v.includes(c) || c.includes(v);
+
+    const isCategoryMatch = (v: any, catLabel: string) => {
+      if (!catLabel) return false;
+      const c = catLabel.toLowerCase().trim();
+      const vCategory = (v.category || '').toLowerCase().trim();
+
+      // 1. Direct category match
+      if (vCategory === c || vCategory.includes(c) || c.includes(vCategory)) return true;
+
+      // 2. Semantic aliases
+      if ((c.includes('dj') || c.includes('music')) && (vCategory.includes('dj') || vCategory.includes('music'))) return true;
+      if ((c.includes('makeup') || c.includes('beauty')) && (vCategory.includes('makeup') || vCategory.includes('beauty'))) return true;
+      if ((c.includes('photo') || c.includes('video') || c.includes('camera')) && (vCategory.includes('photo') || vCategory.includes('video') || vCategory.includes('camera'))) return true;
+      if (c.includes('cater') && vCategory.includes('cater')) return true;
+      if (c.includes('decor') && vCategory.includes('decor')) return true;
+      if ((c.includes('venue') || c.includes('hall')) && (vCategory.includes('venue') || vCategory.includes('hall'))) return true;
+      if (c.includes('tent') && vCategory.includes('tent')) return true;
+      if (c.includes('light') && vCategory.includes('light')) return true;
+      if (c.includes('travel') && vCategory.includes('travel')) return true;
+      if (c.includes('pandit') && vCategory.includes('pandit')) return true;
+      if (c.includes('mehendi') && vCategory.includes('mehendi')) return true;
+      if (c.includes('anchor') && vCategory.includes('anchor')) return true;
+      if (c.includes('band') && vCategory.includes('band')) return true;
+
+      // 3. Match tags
+      if (v.tags && Array.isArray(v.tags) && v.tags.some((t: string) => t.toLowerCase().includes(c) || c.includes(t.toLowerCase()))) return true;
+
+      // 4. Match vendor's created custom packages
+      if (v.custom_packages && Array.isArray(v.custom_packages)) {
+        if (v.custom_packages.some((p: any) => (p.category || '').toLowerCase().includes(c) || (p.name || '').toLowerCase().includes(c))) {
+          return true;
+        }
+      }
+
+      return false;
     };
 
-    const approvedRaw = localStorage.getItem('festivo_approved_vendors');
-    let approvedList: Vendor[] = [];
-    if (approvedRaw) {
-      try { approvedList = JSON.parse(approvedRaw); } catch (e) {}
-    }
+    const loadCategoryVendors = async () => {
+      setLoading(true);
+      const allVendors = await fetchAllVendors();
+      const matchingVendors = allVendors.filter(v => isCategoryMatch(v, cat.label));
+      setVendors(matchingVendors.length > 0 ? matchingVendors : allVendors.slice(0, 8));
+      setLoading(false);
+    };
 
-    const pendingRaw = localStorage.getItem('festivo_pending_vendors');
-    if (pendingRaw) {
-      try {
-        const pendingList = JSON.parse(pendingRaw);
-        const verifiedPending = pendingList.filter((p: any) => p.verified === true || p.details?.status === 'Approved');
-        verifiedPending.forEach((p: any) => {
-          if (!approvedList.some(a => a.id === p.id || a.name === p.name || a.slug === p.slug)) {
-            approvedList.push(p);
-          }
-        });
-      } catch (e) {}
-    }
-
-    const combinedAll = [...approvedList, ...MOCK_VENDORS];
-    const deduplicated = combinedAll.filter((v, idx, self) =>
-      idx === self.findIndex((t) => t.id === v.id || t.name === v.name || t.slug === v.slug)
-    );
-
-    const matchingVendors = deduplicated.filter(v => isCategoryMatch(v.category, cat.label));
-    setVendors(matchingVendors.length > 0 ? matchingVendors : deduplicated.filter(v => isCategoryMatch(v.category, 'Photographer')));
-    setLoading(false);
+    loadCategoryVendors();
+    window.addEventListener('storage', loadCategoryVendors);
+    window.addEventListener('focus', loadCategoryVendors);
+    return () => {
+      window.removeEventListener('storage', loadCategoryVendors);
+      window.removeEventListener('focus', loadCategoryVendors);
+    };
   }, [cat]);
 
   const filtered = vendors.filter(v =>

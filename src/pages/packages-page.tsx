@@ -2,32 +2,44 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package as PackageIcon, Check, Pencil, Trash2, Plus, Sparkles, X, Star,
-  Upload, Image as ImageIcon, Video, Tag, Layers, FileText
+  Upload, Image as ImageIcon, Video, AlertCircle, CreditCard, ShieldAlert, ArrowRight
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { cn } from '@/lib/utils';
 import { useData } from '@/context/DataContext';
+import { useAuth } from '@/context/AuthContext';
 import { type Package } from '@/lib/dashboard-data';
-import { readAndCompressImage } from '@/lib/storageUtils';
+import { readAndCompressImage, safeSetItem } from '@/lib/storageUtils';
+import { syncVendorToCustomerDirectory } from '@/lib/vendorSync';
 
-const CATEGORIES = [
-  'Photography', 'Decoration', 'Catering', 'Makeup', 'Music',
-  'Venue', 'Anchor', 'DJ', 'Planning', 'Choreography'
-];
+import { CATEGORY_LABELS } from '@/lib/categories';
+
+const CATEGORIES = CATEGORY_LABELS;
 
 const PACKAGE_TYPES: Array<'Basic' | 'Standard' | 'Premium' | 'Custom'> = [
   'Basic', 'Standard', 'Premium', 'Custom'
 ];
 
 export function PackagesPage() {
-  const { packagesList, addPackageItem, editPackageItem, deletePackageItem, togglePackagePopular } = useData();
+  const navigate = useNavigate();
+  const { packagesList, addPackageItem, editPackageItem, deletePackageItem, togglePackagePopular, showToast } = useData();
+  const { user, kycRecord } = useAuth();
+
+  // Check strictly if vendor has submitted payment details (Bank Account or UPI ID) in settings
+  const hasBankDetails = Boolean(
+    (user.bankAccount && user.bankAccount.trim()) ||
+    (user.upiId && user.upiId.trim()) ||
+    (user.ifsc && user.ifsc.trim())
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showBankPromptModal, setShowBankPromptModal] = useState(false);
   const [editingPkg, setEditingPkg] = useState<Package | null>(null);
 
   // Form State
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Photography');
+  const [category, setCategory] = useState(user.category || 'Photography');
   const [packageType, setPackageType] = useState<'Basic' | 'Standard' | 'Premium' | 'Custom'>('Premium');
   const [price, setPrice] = useState('');
   const [shortDescription, setShortDescription] = useState('');
@@ -40,9 +52,14 @@ export function PackagesPage() {
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
   const openAddModal = () => {
+    if (!hasBankDetails) {
+      setShowBankPromptModal(true);
+      return;
+    }
+
     setEditingPkg(null);
     setName('');
-    setCategory('Photography');
+    setCategory(user.category || 'Photography');
     setPackageType('Premium');
     setPrice('');
     setShortDescription('');
@@ -57,7 +74,7 @@ export function PackagesPage() {
   const openEditModal = (pkg: Package) => {
     setEditingPkg(pkg);
     setName(pkg.name);
-    setCategory(pkg.category || 'Photography');
+    setCategory(pkg.category || user.category || 'Photography');
     setPackageType(pkg.packageType || 'Premium');
     setPrice(pkg.price);
     setShortDescription(pkg.shortDescription || '');
@@ -107,19 +124,30 @@ export function PackagesPage() {
     setGalleryImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !price) return;
+
+    if (!hasBankDetails) {
+      setIsModalOpen(false);
+      setShowBankPromptModal(true);
+      return;
+    }
+
     const servicesList = servicesRaw.split(',').map(s => s.trim()).filter(Boolean);
 
-    const activeProfile = (() => {
-      try { return JSON.parse(localStorage.getItem('vendor_user_profile') || '{}'); } catch { return {}; }
-    })();
+    const vId = user.id || 'active_vendor';
+    const vEmail = (user.email || '').toLowerCase().trim();
+    const vName = (user.businessName || user.fullName || 'FLOWERS Events').trim();
+    const vSlug = (
+      user.username ||
+      vName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    ).toLowerCase().trim().replace(/^@+/, '') || 'flowers-events';
 
     const payload = {
-      vendorId: activeProfile.id || activeProfile.email || 'active_vendor',
-      vendorEmail: (activeProfile.email || '').toLowerCase().trim(),
-      vendorSlug: (activeProfile.username || activeProfile.slug || '').toLowerCase().trim(),
+      vendorId: vId,
+      vendorEmail: vEmail,
+      vendorSlug: vSlug,
       name,
       category,
       packageType,
@@ -137,7 +165,9 @@ export function PackagesPage() {
     } else {
       addPackageItem(payload);
     }
+
     setIsModalOpen(false);
+    showToast(`Package "${name}" under "${category}" is now live in Supabase!`, 'success');
   };
 
   return (
@@ -148,6 +178,29 @@ export function PackagesPage() {
         icon={PackageIcon}
       />
 
+      {/* Bank Account Verification Warning Banner */}
+      {!hasBankDetails && (
+        <div className="bg-gold-50 border border-gold-300 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-gold-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-dark-900 text-sm">Payout & Bank Details Required</h3>
+              <p className="text-xs text-dark-600 mt-0.5 max-w-xl">
+                To create and publish service packages for clients, you must first add your Bank Account Number or UPI ID in Settings so client payments can be deposited.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/vendor-dashboard/settings')}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-gold-600 hover:bg-gold-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm whitespace-nowrap cursor-pointer"
+          >
+            Complete Payout Settings <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Create Package Card */}
         <motion.button
@@ -155,7 +208,7 @@ export function PackagesPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           whileHover={{ scale: 1.02 }}
-          className="flex min-h-[340px] flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-sage-300 bg-sage-50/30 p-6 text-center text-sage-800 transition-all hover:border-sage-500 hover:bg-sage-50 shadow-sm"
+          className="flex min-h-[340px] flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-sage-300 bg-sage-50/30 p-6 text-center text-sage-800 transition-all hover:border-sage-500 hover:bg-sage-50 shadow-sm cursor-pointer"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sage-600 text-white shadow-glow-sage">
             <Plus className="h-8 w-8" />
@@ -266,14 +319,14 @@ export function PackagesPage() {
                 <div className="flex items-center gap-2 border-t border-border pt-4">
                   <button
                     onClick={() => openEditModal(pkg)}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sage-600 py-2.5 text-xs font-bold text-white transition-colors hover:bg-sage-700 shadow-sm"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sage-600 py-2.5 text-xs font-bold text-white transition-colors hover:bg-sage-700 shadow-sm cursor-pointer"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Edit Package
                   </button>
                   <button
                     onClick={() => togglePackagePopular(pkg.id)}
                     className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
+                      'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors cursor-pointer',
                       pkg.popular ? 'bg-gold-100 border-gold-300 text-gold-700' : 'border-border bg-card text-muted-foreground hover:text-dark-900',
                     )}
                     title="Toggle Most Popular"
@@ -282,7 +335,7 @@ export function PackagesPage() {
                   </button>
                   <button
                     onClick={() => deletePackageItem(pkg.id)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-dark-600 transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-dark-600 transition-colors hover:bg-red-50 hover:text-red-600 cursor-pointer"
                     title="Delete Package"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -293,6 +346,43 @@ export function PackagesPage() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Modal: Bank Details Block Prompt */}
+      {showBankPromptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-900/70 backdrop-blur-md">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-sage-100 relative">
+            <div className="w-12 h-12 rounded-2xl bg-gold-100 text-gold-700 flex items-center justify-center mx-auto">
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div className="text-center">
+              <h3 className="font-bold text-sage-900 text-lg">Payment Details Required</h3>
+              <p className="text-xs text-dark-500 mt-1.5 leading-relaxed">
+                You cannot create packages without adding your payment details. Please complete your Bank Account or UPI ID in Settings so you can receive payouts from customer bookings.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowBankPromptModal(false)}
+                className="flex-1 py-2.5 bg-cream-100 hover:bg-cream-200 text-dark-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBankPromptModal(false);
+                  navigate('/vendor-dashboard/settings?tab=payments');
+                }}
+                className="flex-1 py-2.5 bg-sage-600 hover:bg-sage-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-glow-sage"
+              >
+                Add Payment Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Create or Edit Package */}
       {isModalOpen && (
@@ -311,7 +401,7 @@ export function PackagesPage() {
                 </h3>
                 <p className="text-xs text-muted-foreground">Add pricing, category, descriptions & upload package photos</p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1.5 hover:bg-muted">
+              <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1.5 hover:bg-muted cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -364,7 +454,7 @@ export function PackagesPage() {
                         key={type}
                         onClick={() => setPackageType(type)}
                         className={cn(
-                          'py-2 text-[11px] font-bold rounded-xl border transition-all text-center',
+                          'py-2 text-[11px] font-bold rounded-xl border transition-all text-center cursor-pointer',
                           packageType === type
                             ? 'bg-sage-600 text-white border-sage-600 shadow-sm'
                             : 'bg-muted/50 border-border text-dark-700 hover:bg-muted'
@@ -421,7 +511,7 @@ export function PackagesPage() {
                       <button
                         type="button"
                         onClick={() => setCoverImage('')}
-                        className="absolute top-1 right-1 rounded-full bg-red-600 p-1 text-white opacity-90 hover:opacity-100"
+                        className="absolute top-1 right-1 rounded-full bg-red-600 p-1 text-white opacity-90 hover:opacity-100 cursor-pointer"
                         title="Remove Photo"
                       >
                         <X className="h-3 w-3" />
@@ -465,7 +555,7 @@ export function PackagesPage() {
                         <button
                           type="button"
                           onClick={() => removeGalleryImage(idx)}
-                          className="absolute top-1 right-1 rounded-full bg-red-600 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 rounded-full bg-red-600 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                           title="Remove item"
                         >
                           <X className="h-3 w-3" />
@@ -509,7 +599,7 @@ export function PackagesPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="mt-4 w-full rounded-2xl bg-sage-600 py-3 text-sm font-bold text-white transition-all hover:bg-sage-700 shadow-glow-sage"
+                className="mt-4 w-full rounded-2xl bg-sage-600 py-3 text-sm font-bold text-white transition-all hover:bg-sage-700 shadow-glow-sage cursor-pointer"
               >
                 {editingPkg ? 'Update Package Details' : 'Save & Publish Package'}
               </button>

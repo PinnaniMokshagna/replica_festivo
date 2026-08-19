@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Settings, Camera, User, Mail, Phone, MapPin, Building2, Shield, Bell, CreditCard, Check, AtSign, Globe, Info } from 'lucide-react';
 import { PageHeader } from '@/components/dashboard/page-header';
@@ -10,26 +11,49 @@ import { VerifiedBadge } from '@/components/ui/verified-badge';
 export function SettingsPage() {
   const { user, updateProfile, canChangeUsername, changeUsername, kycStatus } = useAuth();
   const { showToast } = useData();
+  const [searchParams] = useSearchParams();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'profile');
 
-  // Form State
-  const [fullName, setFullName] = useState(user.fullName);
-  const [usernameInput, setUsernameInput] = useState(user.username);
-  const [website, setWebsite] = useState(user.website || 'https://royalmoments.in');
-  const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone);
-  const [location, setLocation] = useState(user.location);
+  // Synchronize tab from URL if changed
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
-  const [businessName, setBusinessName] = useState(user.businessName);
-  const [category, setCategory] = useState(user.category);
-  const [bio, setBio] = useState(user.bio);
+  // Form State - only signup details, all optional fields are strictly empty
+  const [fullName, setFullName] = useState(user.fullName || '');
+  const [usernameInput, setUsernameInput] = useState(user.username || '');
+  const [website, setWebsite] = useState(user.website || '');
+  const [email, setEmail] = useState(user.email || '');
+  const [phone, setPhone] = useState(user.phone || '');
+  const [location, setLocation] = useState(user.location || '');
 
-  const [upiId, setUpiId] = useState(user.upiId);
-  const [bankAccount, setBankAccount] = useState(user.bankAccount);
-  const [ifsc, setIfsc] = useState(user.ifsc);
+  const [businessName, setBusinessName] = useState(user.businessName || '');
+  const [category, setCategory] = useState(user.category || '');
+  const [bio, setBio] = useState(user.bio || '');
+
+  const [upiId, setUpiId] = useState(user.upiId || '');
+  const [bankAccount, setBankAccount] = useState(user.bankAccount || '');
+  const [ifsc, setIfsc] = useState(user.ifsc || '');
+
+  // Keep form in sync when user profile finishes loading
+  useEffect(() => {
+    if (user.fullName) setFullName(user.fullName);
+    if (user.username) setUsernameInput(user.username);
+    if (user.website) setWebsite(user.website);
+    if (user.email) setEmail(user.email);
+    if (user.phone) setPhone(user.phone);
+    if (user.location) setLocation(user.location);
+    if (user.businessName) setBusinessName(user.businessName);
+    if (user.category) setCategory(user.category);
+    if (user.bio) setBio(user.bio);
+    if (user.upiId) setUpiId(user.upiId);
+    if (user.bankAccount) setBankAccount(user.bankAccount);
+    if (user.ifsc) setIfsc(user.ifsc);
+  }, [user]);
 
   const usernameRule = canChangeUsername();
 
@@ -196,12 +220,26 @@ export function SettingsPage() {
                 <input
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
+                  placeholder="e.g. Karthik"
                   className="h-11 w-full rounded-xl border border-border bg-card px-4 text-sm text-dark-900 focus:border-primary focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-dark-700">Website URL</label>
+                <label className="mb-1 block text-xs font-semibold text-dark-700">Location / City</label>
+                <div className="relative">
+                  <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={location}
+                    onChange={e => setLocation(e.target.value)}
+                    placeholder="e.g. Hyderabad, India or Mumbai, India"
+                    className="h-11 w-full rounded-xl border border-border bg-card pl-10 pr-4 text-sm text-dark-900 focus:border-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-dark-700">Website URL (Optional)</label>
                 <div className="relative">
                   <Globe className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -227,6 +265,7 @@ export function SettingsPage() {
                 <input
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
                   className="h-11 w-full rounded-xl border border-border bg-card px-4 text-sm text-dark-900 focus:border-primary focus:outline-none"
                 />
               </div>

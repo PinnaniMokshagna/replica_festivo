@@ -9,6 +9,7 @@ import Navbar from '../components/Navbar';
 import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
+import { fetchVendorBySlug, createBookingInDb } from '../lib/supabase-service';
 import { dataCache } from '../lib/cache';
 import { MOCK_VENDORS } from '../lib/vendors';
 
@@ -71,58 +72,12 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!slug) return;
+    setLoading(true);
 
-    // Check approved vendors from localStorage first (real registered vendors)
-    let foundFromStorage: Vendor | null = null;
-    const approvedRaw = localStorage.getItem('festivo_approved_vendors');
-    if (approvedRaw) {
-      try {
-        const approvedList = JSON.parse(approvedRaw);
-        const match = approvedList.find((v: any) =>
-          v.slug === slug || v.id === slug || v.name?.toLowerCase().replace(/\s+/g, '-') === slug
-        );
-        if (match) {
-          foundFromStorage = {
-            id: match.id || 'v_' + Date.now(),
-            name: match.name,
-            category: match.category || 'Event Provider',
-            location: match.location || 'Koramangala, Bangalore',
-            price_amount: match.price_amount || 45000,
-            price_label: match.price_label || 'Starting Package',
-            price_unit: '₹',
-            rating: match.rating || 5.0,
-            reviews: match.reviews || 1,
-            image: match.image || '',
-            verified: true,
-            badge: 'Verified Partner',
-            badge_color: 'bg-sage-600',
-            slug: match.slug || slug,
-            description: match.details?.bio || match.bio || '',
-            tags: [match.category || 'Event'],
-            gallery: [],
-          } as Vendor;
-        }
-      } catch (e) {}
-    }
-
-    const allVendors = dataCache.get<Vendor[]>('all_vendors') || MOCK_VENDORS;
-    const cached = foundFromStorage || allVendors.find((v) => v.slug === slug) || MOCK_VENDORS.find((v) => v.slug === slug) || MOCK_VENDORS[0];
-    if (cached) {
-      setVendor(cached);
+    fetchVendorBySlug(slug).then((data) => {
+      setVendor(data || MOCK_VENDORS.find(v => v.slug === slug) || MOCK_VENDORS[0]);
       setLoading(false);
-    }
-
-    if (!foundFromStorage) {
-      dataCache
-        .fetchWithCache(`vendor_${slug}`, async () => {
-          const { data } = await supabase.from('vendors').select('*').eq('slug', slug).maybeSingle();
-          return data as Vendor | null;
-        })
-        .then((data) => {
-          setVendor(data || cached || MOCK_VENDORS[0]);
-          setLoading(false);
-        });
-    }
+    });
   }, [slug]);
 
   const set = (field: string, value: string) => {
@@ -186,53 +141,9 @@ export default function BookingPage() {
     setSubmitting(true);
 
     const bookingRef = `FEST-${Date.now().toString().slice(-8)}`;
-    const bookingData = {
-      id: `bk_${Date.now()}`,
-      booking_ref: bookingRef,
-      vendor_id: vendor.id,
-      vendor_name: vendor.name,
-      vendor_slug: vendor.slug,
-      vendor_category: vendor.category,
-      customer: form.customer_name,
-      customer_name: form.customer_name,
-      customer_email: form.customer_email,
-      customer_phone: form.customer_phone,
-      type: form.event_type,
-      event_type: form.event_type,
-      event_date: form.event_date,
-      date: new Date(form.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-      time: '10:00 AM',
-      location: vendor.location,
-      guests: parseInt(form.guests) || 1,
-      budget: `₹${totalAmount.toLocaleString('en-IN')}`,
-      total_amount: totalAmount,
-      special_requests: selectedPackage ? `[Package: ${selectedPackage}] ${form.special_requests || ''}`.trim() : (form.special_requests || null),
-      package: selectedPackage || null,
-      status: 'confirmed',
-      payment_status: 'paid',
-      payment_method: paymentMethod,
-      notes: selectedPackage ? `Booked: ${selectedPackage}` : '',
-      created_at: new Date().toISOString(),
-    };
 
     try {
-      // Save to customer bookings in localStorage
-      const existingCustomerBookings = (() => {
-        try { return JSON.parse(localStorage.getItem('festivo_customer_bookings') || '[]'); } catch { return []; }
-      })();
-      localStorage.setItem('festivo_customer_bookings', JSON.stringify([bookingData, ...existingCustomerBookings]));
-
-      // Also push to vendor's bookings in localStorage so it appears in vendor dashboard
-      const existingVendorBookings = (() => {
-        try { return JSON.parse(localStorage.getItem('vendor_bookings') || '[]'); } catch { return []; }
-      })();
-      localStorage.setItem('vendor_bookings', JSON.stringify([bookingData, ...existingVendorBookings]));
-
-      // Dispatch storage event so vendor dashboard refreshes if open
-      window.dispatchEvent(new Event('storage'));
-
-      // Try Supabase (non-blocking)
-      supabase.from('bookings').insert({
+      await createBookingInDb({
         vendor_id: vendor.id,
         customer_name: form.customer_name,
         customer_email: form.customer_email,
@@ -244,8 +155,10 @@ export default function BookingPage() {
         total_amount: totalAmount,
         status: 'confirmed',
         payment_status: 'paid',
-        payment_intent_id: `demo_${Date.now()}`,
-      }).then(() => {});
+        booking_ref: bookingRef,
+        package_name: selectedPackage || undefined,
+        package_price: selectedPriceRaw || undefined,
+      });
 
       navigate(`/confirmation/${bookingRef}`);
     } catch {

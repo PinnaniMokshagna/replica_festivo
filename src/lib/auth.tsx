@@ -164,6 +164,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         localStorage.setItem('vendor_user_profile', JSON.stringify(vendorProfile));
         localStorage.setItem('vendor_is_authenticated', 'true');
+
+        // --- Ensure vendor appears in Supabase vendor_applications ---
+        // This is the entry the admin dashboard reads from.
+        if (role === 'vendor' || !role) {
+          try {
+            await supabase
+              .from('vendor_applications')
+              .upsert({
+                user_id: data.session.user.id,
+                email: emailLower,
+                business_name: businessName,
+                owner_name: userFullName,
+                category: 'Event Provider',
+                location: finalProfile.city ? `${finalProfile.city}, India` : 'Hyderabad, India',
+                phone: finalProfile.phone || '',
+                status: 'pending',
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'email', ignoreDuplicates: true });
+          } catch (e) {
+            console.warn('Could not create vendor_applications entry:', e);
+          }
+        }
+
+
         window.dispatchEvent(new Event('storage'));
         try {
           const channel = new BroadcastChannel('festivo_auth_channel');
@@ -172,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (e) {}
 
         return { error: null };
+
       }
       if (error && !error.message.toLowerCase().includes('failed to fetch')) {
         return { error: error.message };
@@ -253,64 +278,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       safeSetItem('vendor_user_profile', JSON.stringify(mergedVendorProfile));
       safeSetItem('vendor_is_authenticated', 'true');
 
-      // Always upsert into festivo_pending_vendors so Admin can see this vendor
+      // Upsert to Supabase vendor_applications
       try {
-        const pendingList = JSON.parse(localStorage.getItem('festivo_pending_vendors') || '[]');
-        const existingIdx = pendingList.findIndex(
-          (v: any) => (v.details?.email || '').toLowerCase().trim() === emailLower
-        );
-        if (existingIdx < 0) {
-          const newEntry = {
-            id: vendorId,
-            name: registeredVendorData?.name || businessName,
+        await supabase
+          .from('vendor_applications')
+          .upsert({
+            email: emailLower,
+            business_name: registeredVendorData?.name || businessName,
+            owner_name: finalName,
             category: registeredVendorData?.category || 'Event Provider',
             location: registeredVendorData?.location || 'Hyderabad, India',
-            price_amount: 25000,
-            price_label: 'Starting Package',
-            price_unit: 'event',
-            rating: 5.0,
-            reviews: 0,
-            image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-            logo: finalName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'VN',
-            verified: false,
-            badge: 'Pending Review',
-            badge_color: 'bg-gold-500',
-            slug,
-            details: {
-              email: emailLower,
-              phone: registeredVendorData?.details?.phone || '',
-              owner: finalName,
-              address: registeredVendorData?.location || 'Hyderabad, India',
-              registrationDate: new Date().toISOString().split('T')[0],
-              status: 'Pending Verification',
-              kyc: {
-                idNumber: 'Not submitted',
-                aadhaarFront: '',
-                cancelledCheque: '',
-              },
-            },
-          };
-          pendingList.unshift(newEntry);
-          safeSetItem('festivo_pending_vendors', JSON.stringify(pendingList));
-
-          // Notify admin
-          const notifications = JSON.parse(localStorage.getItem('festivo_admin_notifications') || '[]');
-          notifications.unshift({
-            id: `AN-${Math.floor(100000 + Math.random() * 900000)}`,
-            type: 'new_application',
-            vendorId,
-            vendorName: registeredVendorData?.name || businessName,
-            message: `New vendor signed in: "${registeredVendorData?.name || businessName}" (${emailLower}).`,
-            timestamp: new Date().toISOString(),
-            read: false,
-          });
-          safeSetItem('festivo_admin_notifications', JSON.stringify(notifications));
-          window.dispatchEvent(new Event('storage'));
-        }
+            phone: registeredVendorData?.details?.phone || '',
+            status: 'pending',
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'email', ignoreDuplicates: true });
       } catch (e) {
-        console.warn('Could not upsert vendor to pending list:', e);
+        console.warn('Could not upsert vendor to vendor_applications:', e);
       }
     }
+
 
     setUser(mockUser);
     setProfile(mockProfile);
