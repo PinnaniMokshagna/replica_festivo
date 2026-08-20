@@ -857,21 +857,7 @@ export default function VendorDetailPage() {
                     </div>
                   </div>
 
-                  {/* Quick Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setShowContactModal(true)}
-                      className="py-3 px-4 bg-sage-100 text-sage-900 font-bold text-xs rounded-xl hover:bg-sage-200 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Mail className="w-4 h-4 text-sage-700" /> Send Message
-                    </button>
-                    <button
-                      onClick={() => setShowContactModal(true)}
-                      className="py-3 px-4 bg-sage-800 text-white font-bold text-xs rounded-xl hover:bg-sage-900 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Phone className="w-4 h-4 text-gold-400" /> View Contact
-                    </button>
-                  </div>
+
 
                   {/* Inline Enquiry Form */}
                   <div className="pt-4 border-t border-sage-100">
