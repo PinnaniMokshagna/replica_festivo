@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Sparkles, LogOut, User, Store, LayoutDashboard, Bell, ChevronDown, Calendar, Heart, Shield } from 'lucide-react';
+import { Menu, X, Sparkles, LogOut, User, Store, LayoutDashboard, ChevronDown, Calendar, Heart, Shield } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useUserAvatar } from '../lib/userAvatar';
@@ -13,35 +13,7 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifications, setNotifications] = useState([
-    {
-      id: '1',
-      title: 'Booking Confirmed!',
-      message: 'Royal Palace Convention Center confirmed your event for Sep 15.',
-      time: '2h ago',
-      read: false,
-      link: '/dashboard?tab=bookings'
-    },
-    {
-      id: '2',
-      title: 'Official Tax Invoice Generated',
-      message: 'Tax Invoice & GST Receipt is ready for FEST-2026-8912.',
-      time: '5h ago',
-      read: false,
-      link: '/dashboard?tab=payments'
-    },
-    {
-      id: '3',
-      title: 'Vendor Message Received',
-      message: 'Spice Craft Gourmet Caterers sent updated live food counter menu.',
-      time: '1d ago',
-      read: false,
-      link: '/dashboard?tab=overview'
-    }
-  ]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const unreadCount = notifications.filter(n => !n.read).length;
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
@@ -124,84 +96,6 @@ export default function Navbar() {
             {user ? (
               /* SIGNED IN STATE */
               <>
-                {/* Notifications Bell */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 rounded-xl transition-all hover:scale-110 relative ${
-                      isTransparent ? 'text-white hover:bg-white/10' : 'text-sage-700 hover:bg-sage-100'
-                    }`}
-                    title="Notifications"
-                  >
-                    <Bell className="w-4.5 h-4.5 text-gold-500" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold-500 rounded-full text-[10px] font-extrabold text-dark-900 flex items-center justify-center border border-white shadow-sm animate-pulse">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Notifications Popover Dropdown Panel */}
-                  {showNotifications && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-sage-100 py-3 z-50 animate-scale-up">
-                      <div className="px-4 pb-2 border-b border-sage-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-gold-500" />
-                          <span className="font-bold text-xs text-sage-900">Notifications</span>
-                          {unreadCount > 0 && (
-                            <span className="bg-gold-100 text-gold-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              {unreadCount} new
-                            </span>
-                          )}
-                        </div>
-                        {unreadCount > 0 && (
-                          <button
-                            onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
-                            className="text-[10px] font-bold text-sage-600 hover:text-sage-900"
-                          >
-                            Mark all read
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="max-h-72 overflow-y-auto divide-y divide-sage-50">
-                        {notifications.map(n => (
-                          <div
-                            key={n.id}
-                            onClick={() => {
-                              setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
-                              setShowNotifications(false);
-                              navigate(n.link);
-                            }}
-                            className={`p-3 hover:bg-sage-50/80 transition-colors cursor-pointer flex items-start gap-2.5 ${!n.read ? 'bg-sage-50/40' : ''}`}
-                          >
-                            <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.read ? 'bg-gold-500' : 'bg-sage-300'}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-xs text-sage-900 line-clamp-1">{n.title}</p>
-                              <p className="text-[11px] text-dark-500 line-clamp-2 mt-0.5">{n.message}</p>
-                              <span className="text-[10px] text-dark-400 font-medium block mt-1">{n.time}</span>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setNotifications(prev => prev.filter(item => item.id !== n.id));
-                              }}
-                              className="text-dark-400 hover:text-sage-900 text-xs p-1"
-                              title="Dismiss"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                        {notifications.length === 0 && (
-                          <div className="p-6 text-center text-xs text-dark-400">
-                            No notifications right now ✨
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
                 {/* User Dropdown Button (Username + ChevronDown) */}
                 <div className="relative">
                   <button

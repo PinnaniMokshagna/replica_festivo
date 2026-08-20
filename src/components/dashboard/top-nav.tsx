@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Search, Bell, Wallet, Menu, Camera, ShieldCheck, ShieldAlert, Clock } from 'lucide-react';
+import { Search, Wallet, Menu, Camera, ShieldCheck, ShieldAlert, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -97,24 +97,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
           />
         </div>
 
-        {/* Ringing Bell Icon with Top-Notch Animation */}
-        <motion.button
-          whileHover={{
-            rotate: [0, -22, 22, -16, 16, -8, 8, 0],
-            transition: { duration: 0.7, ease: 'easeInOut' },
-          }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate('/vendor-dashboard/notifications')}
-          className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-card/90 text-dark-800 transition-colors hover:bg-cream-100/70 shadow-sm"
-          title="Notifications"
-        >
-          <Bell className="h-5 w-5 text-sage-700" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-extrabold text-white shadow-glow-gold animate-bounce">
-              {unreadCount}
-            </span>
-          )}
-        </motion.button>
+
 
 
 

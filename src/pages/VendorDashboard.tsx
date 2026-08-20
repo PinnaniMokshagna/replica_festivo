@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Calendar, Star, TrendingUp, Users, Plus, Settings,
   CheckCircle2, Clock, XCircle, ArrowRight, LogOut, Sparkles,
-  BarChart3, Bell, Eye, Wallet, PieChart, Smile, RefreshCw, X, Check,
+  BarChart3, Eye, Wallet, PieChart, Smile, RefreshCw, X, Check,
   Package, MessageSquare, Send, Trash2, Save, Instagram, Facebook, Globe,
   Upload, FileText, CreditCard
 } from 'lucide-react';
@@ -441,9 +441,7 @@ export default function VendorDashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-                  <Bell className="w-4 h-4" />
-                </button>
+
                 <button
                   onClick={async () => { await signOut(); navigate('/'); }}
                   className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors"
