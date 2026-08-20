@@ -612,7 +612,7 @@ export default function CustomerDashboard() {
                             </button>
                           </div>
 
-                          {booking.payment_status !== 'paid' && (
+                          {booking.status !== 'cancelled' && booking.status !== 'rejected' && booking.payment_status !== 'paid' && (
                             <button
                               onClick={() => setActiveTab('payments')}
                               className="px-4 py-2 bg-[#2d4733] hover:bg-[#1f3323] text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm hover:scale-105"
