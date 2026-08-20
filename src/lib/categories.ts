@@ -195,7 +195,7 @@ export const CATEGORIES: CategoryDef[] = [
       'Regional and community-specific rituals',
     ],
     startingPrice: '₹5,100',
-    image: 'https://i.pinimg.com/736x/0b/1f/9b/0b1f9b6c0bfd082c87f8e0dae17554b2.jpg',
+    image: 'https://static.vecteezy.com/system/resources/thumbnails/031/610/653/small_2x/a-picture-of-a-young-indian-man-saying-hello-with-his-hands-together-ai-generative-photo.jpg',
   },
   {
     label: 'Mehendi Artist',
@@ -213,7 +213,7 @@ export const CATEGORIES: CategoryDef[] = [
       'Mehendi cones for DIY application',
     ],
     startingPrice: '₹1,500',
-    image: 'https://static.vecteezy.com/system/resources/thumbnails/031/610/653/small_2x/a-picture-of-a-young-indian-man-saying-hello-with-his-hands-together-ai-generative-photo.jpg',
+    image: 'https://i.pinimg.com/736x/0b/1f/9b/0b1f9b6c0bfd082c87f8e0dae17554b2.jpg',
   },
   {
     label: 'Flower Decor',
