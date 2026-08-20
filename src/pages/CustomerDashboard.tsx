@@ -612,7 +612,14 @@ export default function CustomerDashboard() {
                             </button>
                           </div>
 
-
+                          {booking.payment_status !== 'paid' && (
+                            <button
+                              onClick={() => setActiveTab('payments')}
+                              className="px-4 py-2 bg-[#2d4733] hover:bg-[#1f3323] text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm hover:scale-105"
+                            >
+                              Proceed to Pay <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
