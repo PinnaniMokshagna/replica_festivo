@@ -612,22 +612,7 @@ export default function CustomerDashboard() {
                             </button>
                           </div>
 
-                          {booking.vendor && (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleOpenChat(booking.vendor?.name || 'Vendor', booking.vendor?.category || 'Service', booking.vendor?.image)}
-                                className="px-3 py-1.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5 text-sage-600" /> Live Chat
-                              </button>
-                              <button
-                                onClick={() => handleOpenCall(booking.vendor?.name || 'Vendor', booking.vendor?.location || 'Hyderabad')}
-                                className="px-3 py-1.5 bg-gold-100 text-gold-800 hover:bg-gold-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
-                              >
-                                <PhoneCall className="w-3.5 h-3.5 text-gold-600" /> Call
-                              </button>
-                            </div>
-                          )}
+
                         </div>
                       )}
                     </div>
