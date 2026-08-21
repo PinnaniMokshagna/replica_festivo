@@ -7,7 +7,7 @@ export function BookingRequests() {
   const { bookings, updateBookingStatus } = useData();
   const navigate = useNavigate();
 
-  const pendingRequests = bookings.filter(b => b.status === 'pending');
+  const pendingRequests = bookings.filter(b => b.status === 'pending' || b.status === 'pending_vendor_approval');
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-premium sm:p-6">
@@ -54,16 +54,16 @@ export function BookingRequests() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => updateBookingStatus(req.id, 'confirmed')}
+                    onClick={() => updateBookingStatus(req.id, 'vendor_accepted')}
                     className="flex h-9 w-9 items-center justify-center rounded-lg bg-sage-600 text-white transition-colors hover:bg-sage-700"
-                    title="Accept"
+                    title="Accept Request"
                   >
                     <Check className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => updateBookingStatus(req.id, 'cancelled')}
+                    onClick={() => updateBookingStatus(req.id, 'rejected')}
                     className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-dark-600 transition-colors hover:bg-red-50 hover:text-red-600"
-                    title="Reject"
+                    title="Reject Request"
                   >
                     <X className="h-4 w-4" />
                   </button>

@@ -1,4 +1,4 @@
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type BookingStatus = 'pending' | 'pending_vendor_approval' | 'vendor_accepted' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
 
 export interface NavItem {
   label: string;

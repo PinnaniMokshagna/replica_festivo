@@ -9,9 +9,12 @@ import { useNavigate } from 'react-router-dom';
 
 const statusStyles: Record<BookingStatus, string> = {
   pending: 'bg-gold-50 text-gold-700 border-gold-200',
+  pending_vendor_approval: 'bg-gold-50 text-gold-700 border-gold-200',
+  vendor_accepted: 'bg-blue-50 text-blue-700 border-blue-200',
   confirmed: 'bg-sage-50 text-sage-700 border-sage-200',
   completed: 'bg-dark-100 text-dark-700 border-dark-200',
   cancelled: 'bg-red-50 text-red-600 border-red-200',
+  rejected: 'bg-red-50 text-red-600 border-red-200',
 };
 
 export function BookingsPage() {
@@ -36,7 +39,12 @@ export function BookingsPage() {
       b.customer.toLowerCase().includes(search.toLowerCase()) ||
       b.type.toLowerCase().includes(search.toLowerCase()) ||
       b.location.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || b.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchesStatus = statusFilter === 'All' 
+      || (statusFilter === 'Pending' && (b.status === 'pending' || b.status === 'pending_vendor_approval'))
+      || (statusFilter === 'Vendor Approved' && b.status === 'vendor_accepted')
+      || (statusFilter === 'Confirmed' && b.status === 'confirmed')
+      || (statusFilter === 'Completed' && b.status === 'completed')
+      || (statusFilter === 'Cancelled' && (b.status === 'cancelled' || b.status === 'rejected'));
     return matchesSearch && matchesStatus;
   });
 
@@ -82,7 +90,7 @@ export function BookingsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'].map(f => (
+          {['All', 'Pending', 'Vendor Approved', 'Confirmed', 'Completed', 'Cancelled'].map(f => (
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
@@ -228,21 +236,28 @@ export function BookingsPage() {
               <div>
                 <label className="block text-xs font-semibold text-dark-700 mb-1">Update Status</label>
                 <div className="flex flex-wrap gap-2">
-                  {(['pending', 'confirmed', 'completed', 'cancelled'] as BookingStatus[]).map(st => (
+                  {[
+                    { value: 'pending_vendor_approval', label: 'Pending Approval' },
+                    { value: 'vendor_accepted', label: 'Vendor Approved' },
+                    { value: 'confirmed', label: 'Confirmed (Paid)' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'rejected', label: 'Rejected' },
+                    { value: 'cancelled', label: 'Cancelled' },
+                  ].map(st => (
                     <button
-                      key={st}
+                      key={st.value}
                       onClick={() => {
-                        updateBookingStatus(selectedBooking.id, st);
-                        setSelectedBooking(prev => (prev ? { ...prev, status: st } : null));
+                        updateBookingStatus(selectedBooking.id, st.value as BookingStatus);
+                        setSelectedBooking(prev => (prev ? { ...prev, status: st.value as BookingStatus } : null));
                       }}
                       className={cn(
-                        'rounded-xl border px-3 py-1.5 text-xs font-semibold capitalize transition-all',
-                        selectedBooking.status === st
+                        'rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all',
+                        selectedBooking.status === st.value
                           ? 'border-sage-600 bg-sage-600 text-white shadow-sm'
                           : 'border-border bg-card text-dark-700 hover:bg-muted',
                       )}
                     >
-                      {st}
+                      {st.label}
                     </button>
                   ))}
                 </div>
