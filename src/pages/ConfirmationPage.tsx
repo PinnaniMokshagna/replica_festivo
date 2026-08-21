@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, Download, Home, Star, Sparkles, Mail, Phone, ArrowRight } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, Download, Home, Star, Sparkles, Mail, Phone, ArrowRight, Clock } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
@@ -88,6 +88,12 @@ export default function ConfirmationPage() {
     return () => clearTimeout(timer);
   }, [ref]);
 
+  useEffect(() => {
+    if (booking?.status !== 'confirmed') {
+      setShowConfetti(false);
+    }
+  }, [booking]);
+
   if (loading) {
     return (
       <>
@@ -121,23 +127,31 @@ export default function ConfirmationPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
           <div className="text-center mb-8 animate-fade-up">
             <div className="relative inline-block mb-6">
-              <div className="w-24 h-24 bg-sage-100 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle className="w-12 h-12 text-sage-500" />
+              <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto ${booking.status === 'confirmed' ? 'bg-sage-100' : booking.status === 'vendor_accepted' ? 'bg-blue-100' : 'bg-gold-100'}`}>
+                {booking.status === 'confirmed' ? (
+                  <CheckCircle className="w-12 h-12 text-sage-500" />
+                ) : booking.status === 'vendor_accepted' ? (
+                  <Calendar className="w-12 h-12 text-blue-500" />
+                ) : (
+                  <Clock className="w-12 h-12 text-gold-500" />
+                )}
               </div>
               <div className="absolute -top-1 -right-1 w-8 h-8 bg-gold-400 rounded-full flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
-              <div className="absolute -inset-2 rounded-full border-2 border-sage-200 animate-ping opacity-50" />
+              <div className={`absolute -inset-2 rounded-full border-2 animate-ping opacity-50 ${booking.status === 'confirmed' ? 'border-sage-200' : booking.status === 'vendor_accepted' ? 'border-blue-200' : 'border-gold-200'}`} />
             </div>
             <h1 className="font-display text-4xl md:text-5xl font-bold text-dark-900 mb-3">
-              Booking Confirmed!
+              {booking.status === 'confirmed' ? 'Booking Confirmed!' : booking.status === 'vendor_accepted' ? 'Vendor Approved!' : 'Request Sent!'}
             </h1>
             <p className="text-dark-500 text-lg max-w-md mx-auto">
-              Your event is secured. Get ready to celebrate in style!
+              {booking.status === 'confirmed' ? 'Your event is secured. Get ready to celebrate in style!' : booking.status === 'vendor_accepted' ? 'The vendor has accepted your request. Please complete payment to confirm your booking.' : 'Your booking request has been sent to the vendor. We will notify you once they approve.'}
             </p>
-            <div className="inline-flex items-center gap-2 mt-4 bg-sage-50 border border-sage-200 rounded-xl px-4 py-2">
-              <div className="w-2 h-2 rounded-full bg-sage-500 animate-pulse" />
-              <span className="text-sage-700 text-sm font-bold">Payment Successful</span>
+            <div className={`inline-flex items-center gap-2 mt-4 border rounded-xl px-4 py-2 ${booking.status === 'confirmed' ? 'bg-sage-50 border-sage-200' : booking.status === 'vendor_accepted' ? 'bg-blue-50 border-blue-200' : 'bg-gold-50 border-gold-200'}`}>
+              <div className={`w-2 h-2 rounded-full animate-pulse ${booking.status === 'confirmed' ? 'bg-sage-500' : booking.status === 'vendor_accepted' ? 'bg-blue-500' : 'bg-gold-500'}`} />
+              <span className={`text-sm font-bold ${booking.status === 'confirmed' ? 'text-sage-700' : booking.status === 'vendor_accepted' ? 'text-blue-700' : 'text-gold-700'}`}>
+                {booking.status === 'confirmed' ? 'Payment Successful' : booking.status === 'vendor_accepted' ? 'Payment Pending' : 'Pending Vendor Approval'}
+              </span>
             </div>
           </div>
 
@@ -152,8 +166,9 @@ export default function ConfirmationPage() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-dark-900/80 to-transparent" />
               <div className="absolute top-4 right-4">
-                <span className="bg-sage-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" /> Confirmed
+                <span className={`text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 ${booking.status === 'confirmed' ? 'bg-sage-500' : booking.status === 'vendor_accepted' ? 'bg-blue-500' : 'bg-gold-500'}`}>
+                  {booking.status === 'confirmed' ? <CheckCircle className="w-3 h-3" /> : booking.status === 'vendor_accepted' ? <Calendar className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                  {booking.status === 'confirmed' ? 'Confirmed' : booking.status === 'vendor_accepted' ? 'Vendor Approved' : 'Pending'}
                 </span>
               </div>
               <div className="absolute bottom-4 left-4 right-4">
@@ -240,12 +255,14 @@ export default function ConfirmationPage() {
             </h3>
             <div className="space-y-2.5">
               {[
-                { step: '1', text: `A confirmation email has been sent to ${booking.customer_email}` },
-                { step: '2', text: `${vendor.name} will contact you within 24 hours to finalize details` },
-                { step: '3', text: 'You can reach our support team anytime for assistance' },
-              ].map(({ step, text }) => (
+                { step: '1', text: `A request email has been sent to ${vendor.name}` },
+                { step: '2', text: `${vendor.name} will review and approve your request` },
+                { step: '3', text: 'You will complete the payment to secure the date' },
+              ].map(({ step, text }, i) => (
                 <div key={step} className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-sage-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">{step}</div>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5 ${booking.status === 'confirmed' || (booking.status === 'vendor_accepted' && i < 2) || (booking.status === 'pending_vendor_approval' && i < 1) ? 'bg-sage-500' : 'bg-dark-300'}`}>
+                    {booking.status === 'confirmed' || (booking.status === 'vendor_accepted' && i < 2) || (booking.status === 'pending_vendor_approval' && i < 1) ? <CheckCircle className="w-3 h-3" /> : step}
+                  </div>
                   <p className="text-dark-700 text-sm">{text}</p>
                 </div>
               ))}
