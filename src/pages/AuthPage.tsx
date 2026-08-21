@@ -135,7 +135,7 @@ export default function AuthPage() {
       }
       if (profile?.role === 'admin' || role === 'admin') navigate('/admin');
       else if (profile?.role === 'vendor' || role === 'vendor') navigate('/vendor-dashboard');
-      else navigate('/dashboard');
+      else navigate('/customer-dashboard');
     }
   }, [user, profile, navigate, role, signOut]);
 
@@ -278,7 +278,7 @@ export default function AuthPage() {
           return;
         }
         if (role === 'customer') {
-          navigate('/dashboard');
+          navigate('/customer-dashboard');
         } else {
           setMode('signin');
           setSuccessMsg('Vendor Account created successfully! Please sign in with your credentials to access your Vendor Dashboard.');

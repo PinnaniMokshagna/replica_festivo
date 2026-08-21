@@ -25,7 +25,7 @@ export function DemoRoleSwitcher() {
 
   const handleSwitchToCustomer = () => {
     switchUserRole('customer');
-    navigate('/dashboard');
+    navigate('/customer-dashboard');
   };
 
   const handleQuickApproveCurrentVendor = () => {

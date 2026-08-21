@@ -55,7 +55,6 @@ export default function App() {
               <Route path="/confirmation/:ref" element={<ConfirmationPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/vendor-registration" element={<VendorRegistrationPage />} />
-              <Route path="/dashboard" element={<CustomerDashboard />} />
               <Route path="/customer-dashboard" element={<CustomerDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/budget-planner" element={<BudgetPlannerPage />} />
