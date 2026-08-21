@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider as MainAuthProvider } from './lib/auth';
 import { AuthProvider as DashboardAuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
@@ -56,6 +56,7 @@ export default function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/vendor-registration" element={<VendorRegistrationPage />} />
               <Route path="/dashboard" element={<CustomerDashboard />} />
+              <Route path="/customer-dashboard" element={<CustomerDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/budget-planner" element={<BudgetPlannerPage />} />
               <Route path="/category/:category" element={<CategoryDetailPage />} />
@@ -77,6 +78,7 @@ export default function App() {
                 <Route path="support" element={<SupportPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
               </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
         </DataProvider>
