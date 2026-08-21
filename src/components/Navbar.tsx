@@ -139,7 +139,7 @@ export default function Navbar() {
                       ) : (
                         <>
                           <button
-                            onClick={() => { setShowProfileMenu(false); navigate("/dashboard?tab=overview"); }}
+                            onClick={() => { setShowProfileMenu(false); navigate("/customer-dashboard?tab=overview"); }}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-sage-800 hover:bg-sage-50 transition-colors text-left"
                           >
                             <LayoutDashboard className="w-3.5 h-3.5 text-sage-600" />
@@ -147,7 +147,7 @@ export default function Navbar() {
                           </button>
 
                           <button
-                            onClick={() => { setShowProfileMenu(false); navigate('/dashboard?tab=bookings'); }}
+                            onClick={() => { setShowProfileMenu(false); navigate('/customer-dashboard?tab=bookings'); }}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-sage-800 hover:bg-sage-50 transition-colors text-left"
                           >
                             <Calendar className="w-3.5 h-3.5 text-sage-600" />
@@ -155,7 +155,7 @@ export default function Navbar() {
                           </button>
 
                           <button
-                            onClick={() => { setShowProfileMenu(false); navigate('/dashboard?tab=saved'); }}
+                            onClick={() => { setShowProfileMenu(false); navigate('/customer-dashboard?tab=saved'); }}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-sage-800 hover:bg-sage-50 transition-colors text-left"
                           >
                             <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
@@ -251,13 +251,13 @@ export default function Navbar() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => { setMobileOpen(false); navigate(isVendor ? '/vendor-dashboard' : '/dashboard?tab=bookings'); }}
+                    onClick={() => { setMobileOpen(false); navigate(isVendor ? '/vendor-dashboard' : '/customer-dashboard?tab=bookings'); }}
                     className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-xl border border-sage-200 bg-white text-sage-800"
                   >
                     <Calendar className="w-3.5 h-3.5 text-sage-600" /> Bookings
                   </button>
                   <button
-                    onClick={() => { setMobileOpen(false); navigate(isVendor ? '/vendor-dashboard' : '/dashboard?tab=saved'); }}
+                    onClick={() => { setMobileOpen(false); navigate(isVendor ? '/vendor-dashboard' : '/customer-dashboard?tab=saved'); }}
                     className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-xl border border-sage-200 bg-white text-sage-800"
                   >
                     <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" /> Saved
@@ -265,7 +265,7 @@ export default function Navbar() {
                 </div>
 
                 <button
-                  onClick={() => { setMobileOpen(false); navigate(isVendor ? '/vendor-dashboard' : '/dashboard'); }}
+                  onClick={() => { setMobileOpen(false); navigate(isVendor ? '/vendor-dashboard' : '/customer-dashboard'); }}
                   className="w-full flex items-center justify-center gap-2 text-sm font-bold py-2.5 rounded-xl border border-sage-200 text-sage-700 hover:bg-sage-50 transition-colors"
                 >
                   <LayoutDashboard className="w-4 h-4" /> My Dashboard
