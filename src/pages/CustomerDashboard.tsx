@@ -233,12 +233,23 @@ export default function CustomerDashboard() {
     setReviewRating(5);
   };
 
-  const statusBadge = (status: string) => {
-    if (status === 'confirmed') return <span className="flex items-center gap-1 text-xs font-bold text-sage-700 bg-sage-100 px-2.5 py-1 rounded-full"><CheckCircle2 className="w-3 h-3" /> Confirmed</span>;
-    if (status === 'pending') return <span className="flex items-center gap-1 text-xs font-bold text-gold-700 bg-gold-100 px-2.5 py-1 rounded-full"><Clock className="w-3 h-3" /> Pending</span>;
-    if (status === 'completed') return <span className="flex items-center gap-1 text-xs font-bold text-sage-700 bg-sage-100 px-2.5 py-1 rounded-full"><CheckCircle2 className="w-3 h-3" /> Completed</span>;
-    if (status === 'cancelled') return <span className="flex items-center gap-1 text-xs font-bold text-cream-800 bg-cream-200 px-2.5 py-1 rounded-full"><XCircle className="w-3 h-3" /> Cancelled</span>;
-    return <span className="flex items-center gap-1 text-xs font-bold text-sage-700 bg-sage-100 px-2.5 py-1 rounded-full"><CheckCircle2 className="w-3 h-3" /> Confirmed</span>;
+  const statusBadge = (status: string, paymentStatus?: string) => {
+    if (status === 'confirmed' && paymentStatus === 'paid') {
+      return <span className="flex items-center gap-1 text-xs font-bold text-sage-700 bg-sage-100 px-2.5 py-1 rounded-full"><CheckCircle2 className="w-3 h-3" /> Confirmed</span>;
+    }
+    if (status === 'vendor_accepted' || (status === 'confirmed' && paymentStatus !== 'paid')) {
+      return <span className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full"><Calendar className="w-3 h-3" /> Vendor Approved</span>;
+    }
+    if (status === 'pending' || status === 'pending_vendor_approval') {
+      return <span className="flex items-center gap-1 text-xs font-bold text-gold-700 bg-gold-100 px-2.5 py-1 rounded-full"><Clock className="w-3 h-3" /> Pending Vendor Approval</span>;
+    }
+    if (status === 'completed') {
+      return <span className="flex items-center gap-1 text-xs font-bold text-dark-700 bg-cream-200 px-2.5 py-1 rounded-full"><CheckCircle2 className="w-3 h-3" /> Completed</span>;
+    }
+    if (status === 'cancelled' || status === 'rejected') {
+      return <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2.5 py-1 rounded-full"><XCircle className="w-3 h-3" /> Rejected</span>;
+    }
+    return <span className="flex items-center gap-1 text-xs font-bold text-gold-700 bg-gold-100 px-2.5 py-1 rounded-full"><Clock className="w-3 h-3" /> Pending Vendor Approval</span>;
   };
 
   if (loading) {
@@ -448,7 +459,7 @@ export default function CustomerDashboard() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <p className="font-bold text-sage-900 text-sm truncate">{booking.vendor?.name ?? 'Vendor'}</p>
-                                {statusBadge(booking.status)}
+                                {statusBadge(booking.status, booking.payment_status)}
                               </div>
                               <p className="text-dark-500 text-xs">{booking.event_type} · {new Date(booking.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {booking.guests} guests</p>
                             </div>
@@ -550,7 +561,7 @@ export default function CustomerDashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-bold text-sage-900">{booking.vendor?.name ?? 'Vendor'}</p>
-                            {statusBadge(booking.status)}
+                            {statusBadge(booking.status, booking.payment_status)}
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-dark-500">
                             <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(booking.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
