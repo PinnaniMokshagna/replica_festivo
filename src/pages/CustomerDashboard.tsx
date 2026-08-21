@@ -421,7 +421,17 @@ export default function CustomerDashboard() {
                     ) : (
                       <div className="space-y-3">
                         {upcomingBookings.slice(0, 5).map(booking => (
-                          <div key={booking.id} className="flex items-center gap-4 p-4 bg-sage-50/60 rounded-xl hover:bg-sage-100/60 transition-colors">
+                          <div 
+                            key={booking.id} 
+                            onClick={() => {
+                              if (booking.status === 'vendor_accepted' || (booking.status === 'confirmed' && (booking.payment_status as string) !== 'paid')) {
+                                setActiveTab('payments');
+                              } else {
+                                setActiveTab('bookings');
+                              }
+                            }}
+                            className="flex items-center gap-4 p-4 bg-sage-50/60 rounded-xl hover:bg-sage-100/60 transition-all cursor-pointer hover:shadow-card group/card"
+                          >
                             {booking.vendor && (
                               <button 
                                 type="button"
@@ -623,7 +633,7 @@ export default function CustomerDashboard() {
                             </button>
                           </div>
 
-                          {booking.status !== 'cancelled' && (booking.payment_status as string) !== 'paid' && (
+                          {booking.status !== 'cancelled' && (booking.status === 'vendor_accepted' || booking.status === 'confirmed') && (booking.payment_status as string) !== 'paid' && (
                             <button
                               onClick={() => setActiveTab('payments')}
                               className="px-4 py-2 bg-[#2d4733] hover:bg-[#1f3323] text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm hover:scale-105"

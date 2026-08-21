@@ -284,10 +284,18 @@ export default function ConfirmationPage() {
             </button>
             <button
               onClick={() => navigate('/')}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 bg-gradient-brand text-white font-semibold rounded-xl hover:shadow-glow transition-all"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 border border-sage-300 text-sage-800 font-semibold rounded-xl hover:bg-sage-50 transition-all"
             >
-              <Home className="w-4 h-4" /> Go Home <ArrowRight className="w-4 h-4" />
+              <Home className="w-4 h-4" /> Go Home
             </button>
+            {((booking.status === 'vendor_accepted' || booking.status === 'confirmed') && booking.payment_status !== 'paid') && (
+              <button
+                onClick={() => navigate('/customer-dashboard?tab=payments')}
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 bg-[#2d4733] hover:bg-[#1f3323] text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105"
+              >
+                Proceed to Pay <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
