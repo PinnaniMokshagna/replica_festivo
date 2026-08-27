@@ -423,7 +423,13 @@ export default function CustomerDashboard() {
                         {upcomingBookings.slice(0, 5).map(booking => (
                           <div 
                             key={booking.id} 
-                            onClick={() => navigate(`/confirmation/${booking.booking_ref || booking.id}`)}
+                            onClick={() => {
+                              if (booking.status === 'vendor_accepted' || (booking.status === 'confirmed' && (booking.payment_status as string) !== 'paid')) {
+                                setActiveTab('payments');
+                              } else {
+                                setActiveTab('bookings');
+                              }
+                            }}
                             className="flex items-center gap-4 p-4 bg-sage-50/60 rounded-xl hover:bg-sage-100/60 transition-all cursor-pointer hover:shadow-card group/card"
                           >
                             {booking.vendor && (
