@@ -17,6 +17,12 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Startup diagnostic log
+const _keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || '';
+const _keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+console.log('[Razorpay] KEY_ID:', _keyId ? `${_keyId.slice(0, 12)}...` : 'NOT SET');
+console.log('[Razorpay] KEY_SECRET:', _keySecret ? `SET (${_keySecret.length} chars)` : 'NOT SET');
+
 // Helper function to get Razorpay instance
 function getRazorpayInstance() {
   const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
@@ -81,7 +87,7 @@ app.post('/api/create-order', async (req, res) => {
       key_id: keyId,
     });
   } catch (error) {
-    console.error('Razorpay Create Order Error:', error);
+    console.error('Razorpay Create Order Error:', JSON.stringify(error?.error || error?.message || error));
     const statusCode = error.statusCode || 500;
     return res.status(statusCode).json({
       error: error.error?.description || error.message || 'Failed to create Razorpay order',
