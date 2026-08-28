@@ -3,7 +3,6 @@ import {
   type Vendor,
   type VendorPackage,
   type Booking,
-  type SavedVendor,
   type Review,
   type VendorCalendarEvent,
   type VendorPortfolioItem,
@@ -228,51 +227,55 @@ export async function fetchBookingsForCustomer(customerEmail: string): Promise<B
 
 export async function fetchBookingsForVendor(vendorEmailOrSlug: string, vendorId?: string): Promise<Booking[]> {
   try {
-    // 1. Try to find the vendor application to get the business name / slug
+    const cleanEmailOrSlug = (vendorEmailOrSlug || '').toLowerCase().trim();
+    
+    // 1. Try to find the vendor application to get the business name
     let vendorBusinessName = '';
-    if (vendorId) {
-      const { data: appData } = await supabase
-        .from('vendor_applications')
-        .select('business_name, email')
-        .eq('user_id', vendorId)
-        .maybeSingle();
-      if (appData?.business_name) {
-        vendorBusinessName = appData.business_name;
-      }
+    const { data: appDataList } = await supabase
+      .from('vendor_applications')
+      .select('business_name, email, user_id')
+      .or(`email.eq.${cleanEmailOrSlug}${vendorId ? `,user_id.eq.${vendorId}` : ''}`);
+    
+    if (appDataList && appDataList.length > 0 && appDataList[0].business_name) {
+      vendorBusinessName = appDataList[0].business_name;
     }
 
-    // 2. Get vendor id from vendors table using all possible identifiers
-    let vQuery = supabase.from('vendors').select('id, email, slug, name');
-    
-    let vOrs = [`slug.eq.${vendorEmailOrSlug}`, `email.eq.${vendorEmailOrSlug}`];
+    // 2. Get vendor IDs from vendors table using all possible identifiers
+    let vOrs = [`slug.eq.${cleanEmailOrSlug}`, `email.eq.${cleanEmailOrSlug}`];
     if (vendorBusinessName) {
       vOrs.push(`name.eq.${vendorBusinessName}`);
       const derivedSlug = vendorBusinessName.toLowerCase().replace(/\s+/g, '-');
       vOrs.push(`slug.eq.${derivedSlug}`);
     }
     
-    const { data: vData } = await vQuery.or(vOrs.join(',')).maybeSingle();
+    const { data: vDataList } = await supabase
+      .from('vendors')
+      .select('id, email, slug, name')
+      .or(vOrs.join(','));
 
-    let orConditions = [];
+    let orConditions: string[] = [];
     const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
-    if (vData?.id && isUuid(vData.id)) orConditions.push(`vendor_id.eq.${vData.id}`);
-    if (vData?.slug && isUuid(vData.slug)) orConditions.push(`vendor_id.eq.${vData.slug}`);
-    if (vData?.email && isUuid(vData.email)) orConditions.push(`vendor_id.eq.${vData.email}`);
+    (vDataList || []).forEach(v => {
+      if (v?.id && isUuid(v.id)) orConditions.push(`vendor_id.eq.${v.id}`);
+    });
+
     if (vendorId && isUuid(vendorId)) orConditions.push(`vendor_id.eq.${vendorId}`);
-    if (vendorEmailOrSlug && isUuid(vendorEmailOrSlug)) orConditions.push(`vendor_id.eq.${vendorEmailOrSlug}`);
+    if (cleanEmailOrSlug && isUuid(cleanEmailOrSlug)) orConditions.push(`vendor_id.eq.${cleanEmailOrSlug}`);
     
     // remove duplicates
     orConditions = [...new Set(orConditions)];
     
-    let query = supabase.from('bookings').select('*, vendor:vendors(*)');
-    if (orConditions.length > 0) {
-      query = query.or(orConditions.join(','));
-    } else {
+    if (orConditions.length === 0) {
       return [];
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*, vendor:vendors(*)')
+      .or(orConditions.join(','))
+      .order('created_at', { ascending: false });
+
     if (error) throw error;
     return (data || []).map(parseBookingData);
   } catch (e) {
@@ -553,7 +556,7 @@ export async function addVendorDeal(deal: Omit<VendorDeal, 'id'>): Promise<{ dat
 // 8. CHAT & SUPPORT
 // ============================================================================
 
-export async function fetchChatMessages(vendorNameOrEmail: string, customerEmail: string): Promise<ChatMessage[]> {
+export async function fetchChatMessages(_vendorNameOrEmail: string, customerEmail: string): Promise<ChatMessage[]> {
   try {
     const { data, error } = await supabase
       .from('chat_messages')

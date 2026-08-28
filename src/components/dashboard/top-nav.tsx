@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion';
-import { Search, Wallet, Menu, Camera, ShieldCheck, ShieldAlert, Clock } from 'lucide-react';
+import { Search, Menu, Camera, ShieldAlert, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useData } from '@/context/DataContext';
 import { VerifiedBadge } from '@/components/ui/verified-badge';
 
 interface TopNavProps {
@@ -13,16 +12,8 @@ interface TopNavProps {
 export function TopNav({ onMenuClick }: TopNavProps) {
   const navigate = useNavigate();
   const { user, kycStatus } = useAuth();
-  const { notificationsList, transactions } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<string | null>(null);
-
-  const unreadCount = notificationsList.filter(n => n.unread).length;
-  
-  // Calculate total earnings from transactions
-  const totalEarnings = transactions
-    .filter(t => t.type === 'credit')
-    .reduce((acc, curr) => acc + curr.rawAmount, 0);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

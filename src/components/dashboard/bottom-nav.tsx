@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, CalendarCheck, MessageSquare, Wallet, User } from 'lucide-react';
+import { Home, CalendarCheck, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [

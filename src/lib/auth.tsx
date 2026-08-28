@@ -225,11 +225,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? (registeredVendorData.details?.owner || registeredVendorData.name || formattedName)
       : formattedName;
 
-    const isStudio = finalName.toLowerCase().includes('studio') ||
-      finalName.toLowerCase().includes('events') ||
-      finalName.toLowerCase().includes('photography');
-    const businessName = isStudio ? finalName : `${finalName} Events`;
-
     const vendorId = registeredVendorData?.id || `VND-${Math.floor(100000 + Math.random() * 900000)}`;
     const slug = registeredVendorData?.slug || emailPrefix.replace(/[^a-z0-9]/gi, '-').toLowerCase();
 
@@ -295,7 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const signUp = async (email: string, password: string, name: string, role: UserRole, category?: string) => {
+  const signUp = async (email: string, password: string, name: string, role: UserRole, _category?: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -341,7 +336,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const finalName = name.trim() || derivedName;
     const vendorId = `VND-${Math.floor(100000 + Math.random() * 900000)}`;
-    const slug = emailPrefix.replace(/[^a-z0-9]/gi, '-').toLowerCase();
 
     const mockUser: User = {
       id: role === 'vendor' ? vendorId : 'demo-' + Date.now(),

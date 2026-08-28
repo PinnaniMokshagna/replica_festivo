@@ -13,17 +13,14 @@ import { MOCK_VENDORS } from '../lib/vendors';
 import { useSavedVendors } from '../lib/savedVendors';
 import { useUserAvatar } from '../lib/userAvatar';
 import Navbar from '../components/Navbar';
-import PaymentsTab, { DEFAULT_RECEIPTS } from '../components/PaymentsTab';
-import { useInView } from '../hooks/useInView';
+import PaymentsTab from '../components/PaymentsTab';
 
 type BookingWithVendor = Booking & { vendor?: Vendor };
-
-const DEMO_BOOKINGS: BookingWithVendor[] = DEFAULT_RECEIPTS;
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, signOut, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<BookingWithVendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'bookings' | 'saved' | 'invoices' | 'payments'>('overview');
@@ -45,7 +42,7 @@ export default function CustomerDashboard() {
   const [chatInputText, setChatInputText] = useState('');
   const [activeCallVendor, setActiveCallVendor] = useState<{ name: string; phone: string; location: string } | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; subtitle?: string; slug?: string } | null>(null);
-  const { avatarUrl, setAvatar, removeAvatar } = useUserAvatar();
+  const { avatarUrl, setAvatar } = useUserAvatar();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [editName, setEditName] = useState(profile?.full_name || '');
@@ -76,8 +73,6 @@ export default function CustomerDashboard() {
 
   const { savedIds, toggleSave } = useSavedVendors();
   const savedVendorList = MOCK_VENDORS.filter(v => savedIds.includes(v.id));
-
-  const statsView = useInView<HTMLDivElement>();
 
   useEffect(() => {
     const handleOpenModal = () => setShowProfileModal(true);
@@ -199,14 +194,6 @@ export default function CustomerDashboard() {
         return updated;
       });
     }, 800);
-  };
-
-  const handleOpenCall = (vendorName: string, location: string) => {
-    setActiveCallVendor({
-      name: vendorName,
-      phone: '+91 98765 43210',
-      location: location || 'Hyderabad, India'
-    });
   };
 
   const upcomingBookings = bookings.filter(b => new Date(b.event_date) >= new Date() && b.status !== 'cancelled');

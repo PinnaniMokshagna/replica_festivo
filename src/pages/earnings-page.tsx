@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, TrendingUp, ArrowDownToLine, TrendingDown, Plus, X, IndianRupee, Download } from 'lucide-react';
+import { Wallet, TrendingUp, ArrowDownToLine, TrendingDown, Plus, X, Download } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { cn } from '@/lib/utils';

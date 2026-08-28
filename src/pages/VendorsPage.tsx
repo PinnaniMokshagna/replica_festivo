@@ -7,8 +7,7 @@ import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
 import { fetchAllVendors } from '../lib/supabase-service';
-import { dataCache } from '../lib/cache';
-import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
+import { getVendorImageAndGallery } from '../lib/vendors';
 
 import { CATEGORY_LABELS } from '../lib/categories';
 const CATEGORIES = ['All', ...CATEGORY_LABELS];
@@ -126,7 +125,7 @@ export default function VendorsPage() {
   const [priceRange, setPriceRange] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [occasionLabel, setOccasionLabel] = useState('');
-  const { ref: gridRef, inView: gridInView } = useInView<HTMLDivElement>(0);
+  const { ref: gridRef } = useInView<HTMLDivElement>(0);
 
   useEffect(() => {
     window.scrollTo(0, 0);

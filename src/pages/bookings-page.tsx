@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarCheck, Clock, MapPin, Eye, MessageSquare, Search, Plus, X, Trash2, CheckCircle2 } from 'lucide-react';
+import { CalendarCheck, Clock, MapPin, Eye, MessageSquare, Search, Plus, X, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { cn } from '@/lib/utils';
 import { useData, type ExtendedBooking } from '@/context/DataContext';

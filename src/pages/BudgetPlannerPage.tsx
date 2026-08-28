@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Sparkles, ArrowRight, ArrowLeft, Calculator, Wallet,
-  Users, Calendar, TrendingUp, PieChart, Lightbulb,
+  Sparkles, ArrowRight, Calculator,
+  Users, TrendingUp, PieChart, Lightbulb,
   CheckCircle2, Info, ChevronRight, Download, RefreshCw
 } from 'lucide-react';
 import Navbar from '../components/Navbar';

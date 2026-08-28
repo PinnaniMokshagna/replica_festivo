@@ -10,6 +10,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_SUPABASE_URL
-        value: https://vbsrhcuexsawjqqyrnii.supabase.co
+        value: https://ymtczcqzrzhbmhoeayvs.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
-        value: sb_publishable_o9sN9sximLLzAEnpHOaKNQ_ANC50ayh
+        value: sb_publishable_Hn8WeEL0Ms0KpQ_19JGgOw_81rdLiaI

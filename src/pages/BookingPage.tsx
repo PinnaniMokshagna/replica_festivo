@@ -10,7 +10,6 @@ import { useInView } from '../hooks/useInView';
 import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
 import { fetchVendorBySlug, createBookingInDb, fetchBookingByRef } from '../lib/supabase-service';
-import { dataCache } from '../lib/cache';
 import { MOCK_VENDORS } from '../lib/vendors';
 
 const EVENT_TYPES = ['Wedding', 'Birthday Party', 'Corporate Event', 'Anniversary', 'Engagement', 'Baby Shower', 'Other'];

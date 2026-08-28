@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, User, Mail, Phone, MapPin, Building2, Shield, Bell, CreditCard, Check, AtSign, Globe, Info } from 'lucide-react';
+import { Settings, Camera, User, MapPin, Building2, Shield, Bell, CreditCard, Check, AtSign, Globe, Info } from 'lucide-react';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';

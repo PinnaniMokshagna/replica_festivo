@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowDownToLine, TrendingUp } from 'lucide-react';
+import { ArrowDownToLine } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
 export function EarningsCard() {

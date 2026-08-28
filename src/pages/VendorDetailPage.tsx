@@ -2,16 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Star, MapPin, CheckCircle2, Heart, Share2, ArrowLeft, ArrowRight, X,
-  Users, Clock, Sparkles, ChevronLeft, Camera, Calendar, MessageSquare,
-  Phone, Mail, Send, ChevronDown, ChevronUp, ShieldCheck, Building2,
-  Utensils, Music, HelpCircle, Check, ThumbsUp, Plus
+  Users, Sparkles, ChevronLeft, Camera, Calendar, MessageSquare,
+  Phone, Mail, ChevronDown, ChevronUp, ShieldCheck, Building2,
+  Check
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
 import { fetchVendorBySlug, fetchAllVendors, fetchReviewsForVendor } from '../lib/supabase-service';
-import { dataCache } from '../lib/cache';
 import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
 
 type Review = {
@@ -109,7 +107,6 @@ export default function VendorDetailPage() {
   const [email, setEmail] = useState('');
   const [functionDate, setFunctionDate] = useState('');
   const [guests, setGuests] = useState('100');
-  const [rooms, setRooms] = useState('10');
   const [functionType, setFunctionType] = useState('Wedding');
   const [whatsappNotify, setWhatsappNotify] = useState(true);
   const [enquirySuccess, setEnquirySuccess] = useState(false);

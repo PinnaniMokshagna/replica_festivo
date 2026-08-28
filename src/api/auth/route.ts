@@ -4,7 +4,7 @@
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, email, password, fullName, businessName } = body;
+    const { action, email, fullName, businessName } = body;
 
     if (action === 'signup') {
       // Create user & vendor in PostgreSQL / Supabase
@@ -35,6 +35,7 @@ export async function POST(req: Request) {
 
     return Response.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
+    console.error('Auth API error:', error);
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

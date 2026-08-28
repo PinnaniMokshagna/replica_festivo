@@ -1,6 +1,6 @@
 import {
-  Camera, Utensils, Flower2, Building2, Music, Zap,
-  Lightbulb, Sparkles, Car, Heart, Handshake, Palette,
+  Camera, Utensils, Flower2, Building2, Music,
+  Lightbulb, Sparkles, Car, Handshake, Palette,
   Mic, PartyPopper, Tent, type LucideIcon
 } from 'lucide-react';
 

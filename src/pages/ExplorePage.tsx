@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, Star, MapPin, CheckCircle2, Sparkles,
+  ArrowRight, Star, MapPin, Sparkles,
   Search, CalendarCheck, Handshake, PartyPopper, Award,
   ChevronRight
 } from 'lucide-react';
@@ -9,7 +9,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useInView } from '../hooks/useInView';
 import { CATEGORIES } from '../lib/categories';
-import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
+import { getVendorImageAndGallery } from '../lib/vendors';
 import { fetchAllVendors } from '../lib/supabase-service';
 
 export default function ExplorePage() {
@@ -17,7 +17,6 @@ export default function ExplorePage() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredCat, setHoveredCat] = useState<number | null>(null);
-  const [videoDimmed, setVideoDimmed] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
   const heroRef = useInView<HTMLDivElement>();

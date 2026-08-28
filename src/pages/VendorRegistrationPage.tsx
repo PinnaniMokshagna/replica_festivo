@@ -80,16 +80,16 @@ export default function VendorRegistrationPage() {
   const [brochureUploaded, setBrochureUploaded] = useState(true);
 
   // Step 8: Business Verification (KYC Documents are blank initially)
-  const [aadhaarFrontUrl, setAadhaarFrontUrl] = useState('');
-  const [aadhaarBackUrl, setAadhaarBackUrl] = useState('');
-  const [panUrl, setPanUrl] = useState('');
-  const [gstUrl, setGstUrl] = useState('');
-  const [regCertUrl, setRegCertUrl] = useState('');
+  const [aadhaarFrontUrl] = useState('');
+  const [aadhaarBackUrl] = useState('');
+  const [panUrl] = useState('');
+  const [gstUrl] = useState('');
+  const [regCertUrl] = useState('');
   const [bankHolderName, setBankHolderName] = useState('');
   const [bankAccNum, setBankAccNum] = useState('');
   const [bankIfsc, setBankIfsc] = useState('');
   const [bankName, setBankName] = useState('');
-  const [cancelledChequeUrl, setCancelledChequeUrl] = useState('');
+  const [cancelledChequeUrl] = useState('');
 
   // Step 9: Social Media (Optional)
   const [instagram, setInstagram] = useState('');
@@ -296,9 +296,8 @@ export default function VendorRegistrationPage() {
       safeSetItem('festivo_admin_notifications', JSON.stringify([newAdminNotification, ...adminNotifications]));
 
       // 2. Submit to Supabase database
-      let createdVendorId: string | null = null;
       try {
-        const { data: insertedVendor, error: vendorErr } = await supabase
+        const { error: vendorErr } = await supabase
           .from('vendors')
           .insert({
             name: newVendor.name,
@@ -321,8 +320,6 @@ export default function VendorRegistrationPage() {
 
         if (vendorErr) {
           console.error('Supabase vendors insert error:', vendorErr);
-        } else if (insertedVendor) {
-          createdVendorId = insertedVendor.id;
         }
       } catch (err) {
         console.warn('Vendor insert failed:', err);
@@ -375,6 +372,7 @@ export default function VendorRegistrationPage() {
           },
           { onConflict: 'user_id' }
         );
+        if (vendorProfileErr) console.error('Supabase vendor_profiles insert error:', vendorProfileErr);
         await supabase.from('vendor_applications').upsert(
           {
             email: businessEmail.toLowerCase().trim(),

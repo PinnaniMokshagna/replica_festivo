@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { LayoutDashboard } from 'lucide-react';
 import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { UpcomingEvents } from '@/components/dashboard/upcoming-events';

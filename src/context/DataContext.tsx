@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/lib/supabase';
 import {
   type BookingStatus,
   type NotificationItem,
@@ -8,7 +9,6 @@ import {
   notifications as initialNotifications,
   profileTasks as initialProfileTasks,
 } from '@/lib/dashboard-data';
-import { supabase } from '@/lib/supabase';
 import {
   fetchPackagesForVendor,
   createVendorPackage,
@@ -218,7 +218,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
     };
     loadVendorBookings();
-  }, [vendorEmail, vendorSlug]);
+
+    // Subscribe to realtime booking updates & tab focus
+    const channel = supabase
+      .channel(`vendor_bookings_${vendorSlug || vendorEmail}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        () => {
+          loadVendorBookings();
+        }
+      )
+      .subscribe();
+
+    const onFocus = () => loadVendorBookings();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [vendorEmail, vendorSlug, user?.id]);
 
   const addBooking = (booking: Omit<ExtendedBooking, 'id'>) => {
     const newB: ExtendedBooking = { ...booking, id: 'bk_' + Date.now() };

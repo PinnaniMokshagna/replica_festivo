@@ -63,7 +63,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
-  const { logout, kycStatus, setAuthModalOpen } = useAuth();
+  const { logout, kycStatus } = useAuth();
   const { signOut: signOutMain } = useMainAuth();
   const { bookings, conversations } = useData();
 

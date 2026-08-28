@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vbsrhcuexsawjqqyrnii.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_o9sN9sximLLzAEnpHOaKNQ_ANC50ayh';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ymtczcqzrzhbmhoeayvs.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Hn8WeEL0Ms0KpQ_19JGgOw_81rdLiaI';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -70,8 +70,9 @@ export type Booking = {
   event_date: string;
   guests: number;
   special_requests: string | null;
+  rejection_reason?: string;
   total_amount: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'pending_vendor_approval' | 'vendor_accepted' | 'rejected';
   payment_status: 'unpaid' | 'paid' | 'refunded';
   payment_intent_id: string | null;
   booking_ref: string;

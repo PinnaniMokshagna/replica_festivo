@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LifeBuoy, MessageSquare, Mail, Phone, BookOpen, ChevronRight, Plus, Search, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { LifeBuoy, MessageSquare, Mail, Phone, BookOpen, ChevronRight, Search, X, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { cn } from '@/lib/utils';
 import { useData } from '@/context/DataContext';

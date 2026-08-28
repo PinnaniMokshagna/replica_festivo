@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Sparkles, Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft,
   CheckCircle2, Building2, Users, Shield, Zap,
-  Store, Search, CalendarCheck, ChevronDown, Tag,
+  Store, Search, CalendarCheck, Tag,
   TrendingUp, Heart, Briefcase, Phone, FileText, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,7 +55,7 @@ const ADMIN_FEATURES = [
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, signUp, signOut, user, profile, setDemoAdmin } = useAuth();
+  const { signIn, signUp, signOut, user, profile } = useAuth();
 
   const getInitialRole = (): UserRole | null => {
     if (searchParams.get('admin') === 'true' || searchParams.get('role') === 'admin') return 'admin';
@@ -82,7 +82,6 @@ export default function AuthPage() {
   const [otpTimer, setOtpTimer] = useState(0);
   const [otpNotice, setOtpNotice] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['Photographer']);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [modalType, setModalType] = useState<'terms' | 'privacy' | null>(null);
 
   const toggleCategory = (cat: string) => {
@@ -294,21 +293,6 @@ export default function AuthPage() {
   const switchMode = (m: 'signin' | 'signup') => {
     setMode(m);
     setError('');
-    setConfirmPassword('');
-    setMobileNumber('');
-    setOtp('');
-    setAgreeTerms(false);
-    setOtpSent(false);
-    setOtpTimer(0);
-    setOtpNotice('');
-  };
-
-  const resetRole = () => {
-    setRole(null);
-    setError('');
-    setName('');
-    setEmail('');
-    setPassword('');
     setConfirmPassword('');
     setMobileNumber('');
     setOtp('');

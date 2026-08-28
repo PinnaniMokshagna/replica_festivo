@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, BarChart3, Users, Wallet, TrendingUp, CheckCircle2,
-  XCircle, Clock, Store, Star, Sparkles, ArrowRight, LogOut,
-  AlertCircle, Download, Eye, Search, Filter, DollarSign, X, FileText, ExternalLink, Trash2, RefreshCw
+  Shield, BarChart3, Wallet, CheckCircle2,
+  XCircle, Clock, Store, Star, LogOut,
+  Eye, X, Trash2, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -67,18 +67,10 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
-  // Admin Guard: Strict role check
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    const isAuth = localStorage.getItem('festivo_admin_authenticated') === 'true';
-    return isAuth;
-  });
-
   const [vendors, setVendors] = useState<VendorWithProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'applications' | 'overview' | 'vendors' | 'bookings'>('applications');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
   const [applications, setApplications] = useState<any[]>([]);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
@@ -159,14 +151,10 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Live polling & Realtime subscription
+  // Realtime subscription & focus listener
   useEffect(() => {
     loadApplications();
 
-    // 1. Polling fallback every 3s
-    const pollInterval = setInterval(loadApplications, 3000);
-
-    // 2. Supabase Realtime channel
     const channel = supabase
       .channel('admin_vendor_applications_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_applications' }, () => {
@@ -178,7 +166,6 @@ export default function AdminDashboard() {
     window.addEventListener('focus', onFocus);
 
     return () => {
-      clearInterval(pollInterval);
       supabase.removeChannel(channel);
       window.removeEventListener('focus', onFocus);
     };

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, Pencil, Trash2, Eye, Sparkles, Plus, Package as PackageIcon } from 'lucide-react';
+import { Check, Trash2, Eye, Sparkles, Plus, Package as PackageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '@/context/DataContext';
 import { cn } from '@/lib/utils';

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, CheckCircle2, AlertTriangle, FileText, User, Building, CreditCard, ShieldAlert } from 'lucide-react';
+import { X, ShieldCheck, User, Building, CreditCard, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { InstagramBadge } from '@/components/ui/instagram-badge';

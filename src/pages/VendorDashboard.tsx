@@ -5,7 +5,7 @@ import {
   CheckCircle2, Clock, XCircle, ArrowRight, LogOut, Sparkles,
   BarChart3, Eye, Wallet, PieChart, Smile, RefreshCw, X, Check,
   Package, MessageSquare, Send, Trash2, Save, Instagram, Facebook, Globe,
-  Upload, FileText, CreditCard
+  FileText, CreditCard
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -49,13 +49,6 @@ type VendorProfileData = {
   website: string;
 };
 
-const QUICK_STATS_EMPTY = [
-  { label: 'Total Bookings', value: '0', icon: Calendar, color: 'bg-sage-50 text-sage-600' },
-  { label: 'This Month', value: '0', icon: TrendingUp, color: 'bg-sage-100 text-sage-700' },
-  { label: 'Avg Rating', value: '—', icon: Star, color: 'bg-cream-100 text-cream-800' },
-  { label: 'Total Revenue', value: '₹0', icon: BarChart3, color: 'bg-cream-50 text-cream-900' },
-];
-
 export default function VendorDashboard() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
@@ -80,7 +73,6 @@ export default function VendorDashboard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [newMessage, setNewMessage] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
 
   // Profile tab state
   const [vendorProfile, setVendorProfile] = useState<VendorProfileData | null>(null);
@@ -182,7 +174,6 @@ export default function VendorDashboard() {
   useEffect(() => {
     if (activeTab !== 'chat' || vendors.length === 0) return;
     const fetchMessages = async () => {
-      setChatLoading(true);
       const { data } = await supabase
         .from('chat_messages')
         .select('*')
@@ -194,7 +185,6 @@ export default function VendorDashboard() {
           setSelectedCustomer((data[0] as ChatMessage).customer_email);
         }
       }
-      setChatLoading(false);
     };
     fetchMessages();
   }, [activeTab, vendors]);
@@ -297,7 +287,7 @@ export default function VendorDashboard() {
   };
 
   const totalRevenue = bookings.filter(b => b.payment_status === 'paid').reduce((s, b) => {
-    const val = typeof b.total_amount === 'string' ? Number(b.total_amount.replace(/[^0-9.-]+/g, "")) || 0 : b.total_amount;
+    const val = typeof b.total_amount === 'string' ? Number(String(b.total_amount).replace(/[^0-9.-]+/g, "")) || 0 : (b.total_amount || 0);
     return s + (val || 0);
   }, 0);
   const thisMonth = bookings.filter(b => {

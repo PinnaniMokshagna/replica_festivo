@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, useLocation } from 'react-router-dom';
 
 export function AnimatedRoutes({ children }: { children: React.ReactNode }) {
   const location = useLocation();

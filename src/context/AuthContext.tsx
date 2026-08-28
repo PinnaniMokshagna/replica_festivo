@@ -221,11 +221,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user.email]);
 
-  // Sync with Supabase Auth session & setup Realtime / polling
+  // Sync with Supabase Auth session & setup Realtime / focus listener
   useEffect(() => {
     refreshKycStatus();
-
-    const interval = setInterval(refreshKycStatus, 3000);
 
     const channel = supabase
       .channel('public:vendor_applications_realtime')
@@ -247,7 +245,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('storage', onFocusOrStorage);
 
     return () => {
-      clearInterval(interval);
       supabase.removeChannel(channel);
       window.removeEventListener('focus', onFocusOrStorage);
       window.removeEventListener('storage', onFocusOrStorage);
@@ -342,7 +339,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .filter(Boolean)
       .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ') || 'Vendor';
-    const username = emailPrefix.replace(/[^a-z0-9]/gi, '.').toLowerCase();
 
     setIsAuthenticated(true);
     localStorage.setItem('vendor_is_authenticated', 'true');

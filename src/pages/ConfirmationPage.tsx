@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, Calendar, MapPin, Users, Download, Home, Star, Sparkles, Mail, Phone, ArrowRight, Clock } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useInView } from '../hooks/useInView';
-import { supabase } from '../lib/supabase';
 import type { Booking, Vendor } from '../lib/supabase';
 import { fetchBookingByRef } from '../lib/supabase-service';
 

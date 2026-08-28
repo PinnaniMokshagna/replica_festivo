@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package as PackageIcon, Check, Pencil, Trash2, Plus, Sparkles, X, Star,
-  Upload, Image as ImageIcon, Video, AlertCircle, CreditCard, ShieldAlert, ArrowRight
+  Upload, Image as ImageIcon, Video, CreditCard, ArrowRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/dashboard/page-header';
@@ -10,8 +10,7 @@ import { cn } from '@/lib/utils';
 import { useData } from '@/context/DataContext';
 import { useAuth } from '@/context/AuthContext';
 import { type Package } from '@/lib/dashboard-data';
-import { readAndCompressImage, safeSetItem } from '@/lib/storageUtils';
-import { syncVendorToCustomerDirectory } from '@/lib/vendorSync';
+import { readAndCompressImage } from '@/lib/storageUtils';
 
 import { CATEGORY_LABELS } from '@/lib/categories';
 

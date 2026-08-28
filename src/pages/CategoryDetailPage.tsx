@@ -1,18 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, ArrowLeft, Star, MapPin, CheckCircle2, Sparkles,
-  Search, Heart, X
+  ArrowRight, ArrowLeft, Star, MapPin, CheckCircle2,
+  Search, Heart
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useInView } from '../hooks/useInView';
-import { supabase } from '../lib/supabase';
 import type { Vendor } from '../lib/supabase';
 import { fetchAllVendors } from '../lib/supabase-service';
 import { getCategory, CATEGORIES } from '../lib/categories';
-import { dataCache } from '../lib/cache';
-import { MOCK_VENDORS, getVendorImageAndGallery } from '../lib/vendors';
 import { useSavedVendors } from '../lib/savedVendors';
 
 export default function CategoryDetailPage() {

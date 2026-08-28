@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, MessageCircle, ThumbsUp, X, CheckCircle2, MessageSquareQuote } from 'lucide-react';
+import { Star, MessageCircle, ThumbsUp, X, MessageSquareQuote } from 'lucide-react';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { cn } from '@/lib/utils';
 import { useData } from '@/context/DataContext';

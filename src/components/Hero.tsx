@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MapPin, Calendar, ChevronDown } from 'lucide-react';
+import { Search, MapPin, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const slides = [
@@ -44,7 +44,6 @@ export default function Hero() {
   const [current, setCurrent] = useState(0);
   const [eventType, setEventType] = useState('');
   const [city, setCity] = useState('');
-  const [date, setDate] = useState('');
   const [loaded, setLoaded] = useState(false);
   const navigate = useNavigate();
 
@@ -60,7 +59,6 @@ export default function Hero() {
     const params = new URLSearchParams();
     if (eventType) params.set('occasion', eventType);
     if (city) params.set('city', city);
-    if (date) params.set('date', date);
     navigate(`/vendors?${params.toString()}`);
   };
 

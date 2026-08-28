@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Sparkles, LogOut, User, Store, LayoutDashboard, ChevronDown, Calendar, Heart, Shield } from 'lucide-react';
+import { Menu, X, Sparkles, LogOut, User, Store, LayoutDashboard, ChevronDown, Calendar, Heart } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useUserAvatar } from '../lib/userAvatar';
