@@ -158,7 +158,7 @@ app.post('/api/verify-payment', async (req, res) => {
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
-app.get('*', (req, res, next) => {
+app.get('/{*path}', (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
