@@ -151,6 +151,7 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
   const [cardCvv, setCardCvv] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
+  const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
 
   // Financial Calculations
   const totalSpent = bookings.filter(b => b.payment_status === 'paid').reduce((s, b) => s + b.total_amount, 0);
@@ -174,52 +175,46 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
   const handleProcessPayment = async () => {
     if (!selectedPaymentBooking) return;
     setIsProcessingPayment(true);
+    setPaymentErrorMessage(null);
 
     if (paymentMethod === 'razorpay') {
-      const launched = initializeRazorpayCheckout({
-        amount: selectedPaymentBooking.total_amount,
-        bookingRef: selectedPaymentBooking.booking_ref,
-        serviceName: selectedPaymentBooking.vendor?.name || 'Event Service',
-        customerName: selectedPaymentBooking.customer_name || userName || 'Customer',
-        customerEmail: selectedPaymentBooking.customer_email || userEmail || 'customer@example.com',
-        customerPhone: selectedPaymentBooking.customer_phone || '+91 8618471424',
-        onSuccess: async (razorpayPaymentId: string) => {
-          const { error } = await supabase
-            .from('bookings')
-            .update({ payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId })
-            .eq('id', selectedPaymentBooking.id);
+      try {
+        await initializeRazorpayCheckout({
+          amount: selectedPaymentBooking.total_amount,
+          bookingRef: selectedPaymentBooking.booking_ref,
+          serviceName: selectedPaymentBooking.vendor?.name || 'Festivo Event Service',
+          customerName: selectedPaymentBooking.customer_name || userName || 'Festivo Customer',
+          customerEmail: selectedPaymentBooking.customer_email || userEmail || 'customer@festivo.in',
+          customerPhone: selectedPaymentBooking.customer_phone || '+91 9876543210',
+          onSuccess: async (razorpayPaymentId: string) => {
+            const { error } = await supabase
+              .from('bookings')
+              .update({ payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId })
+              .eq('id', selectedPaymentBooking.id);
 
-          if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
-            setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId } : b));
-            setPaymentSuccessMessage(`Razorpay Payment (ID: ${razorpayPaymentId}) of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} successful!`);
-            setTimeout(() => {
-              setSelectedPaymentBooking(null);
-              setPaymentSuccessMessage(null);
-            }, 2500);
+            if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
+              setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId } : b));
+              setPaymentSuccessMessage(`Razorpay Payment Verified (ID: ${razorpayPaymentId}) of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} successful!`);
+              setTimeout(() => {
+                setSelectedPaymentBooking(null);
+                setPaymentSuccessMessage(null);
+              }, 3000);
+            }
+            setIsProcessingPayment(false);
+          },
+          onFailure: (err: any) => {
+            const msg = typeof err === 'string' ? err : err?.description || err?.message || 'Payment processing failed';
+            console.error('Razorpay payment error:', err);
+            setPaymentErrorMessage(msg);
+            setIsProcessingPayment(false);
+          },
+          onDismiss: () => {
+            setIsProcessingPayment(false);
           }
-          setIsProcessingPayment(false);
-        },
-        onFailure: (err: any) => {
-          console.log('Razorpay payment modal error:', err);
-          setIsProcessingPayment(false);
-        }
-      });
-
-      if (!launched) {
-        // Fallback execution if SDK is loading or in test offline mode
-        const { error } = await supabase
-          .from('bookings')
-          .update({ payment_status: 'paid', status: 'confirmed' })
-          .eq('id', selectedPaymentBooking.id);
-
-        if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
-          setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed' } : b));
-          setPaymentSuccessMessage(`Payment of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} completed via Razorpay!`);
-          setTimeout(() => {
-            setSelectedPaymentBooking(null);
-            setPaymentSuccessMessage(null);
-          }, 2000);
-        }
+        });
+      } catch (err: any) {
+        console.error('Razorpay launch exception:', err);
+        setPaymentErrorMessage(err.message || 'Unable to open Razorpay checkout');
         setIsProcessingPayment(false);
       }
       return;
@@ -412,6 +407,13 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
                 </div>
               ) : (
                 <>
+                  {paymentErrorMessage && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                      <span>{paymentErrorMessage}</span>
+                    </div>
+                  )}
+
                   {/* Select Payment Method */}
                   <div>
                     <label className="block text-[11px] font-bold text-sage-900 uppercase tracking-wider mb-2">Select Payment Method</label>
