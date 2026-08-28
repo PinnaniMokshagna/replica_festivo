@@ -144,11 +144,6 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
   // Payment Modal States
   const [selectedPaymentBooking, setSelectedPaymentBooking] = useState<BookingWithVendor | null>(null);
   const [viewReceiptBooking, setViewReceiptBooking] = useState<BookingWithVendor | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'card' | 'upi' | 'netbanking'>('razorpay');
-  const [upiId, setUpiId] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
@@ -171,69 +166,51 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
     );
   };
 
-  // Process Razorpay / Custom Payment
+  // Process Razorpay Standard Checkout
   const handleProcessPayment = async () => {
     if (!selectedPaymentBooking) return;
     setIsProcessingPayment(true);
     setPaymentErrorMessage(null);
 
-    if (paymentMethod === 'razorpay') {
-      try {
-        await initializeRazorpayCheckout({
-          amount: selectedPaymentBooking.total_amount,
-          bookingRef: selectedPaymentBooking.booking_ref,
-          serviceName: selectedPaymentBooking.vendor?.name || 'Festivo Event Service',
-          customerName: selectedPaymentBooking.customer_name || userName || 'Festivo Customer',
-          customerEmail: selectedPaymentBooking.customer_email || userEmail || 'customer@festivo.in',
-          customerPhone: selectedPaymentBooking.customer_phone || '+91 9876543210',
-          onSuccess: async (razorpayPaymentId: string) => {
-            const { error } = await supabase
-              .from('bookings')
-              .update({ payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId })
-              .eq('id', selectedPaymentBooking.id);
+    try {
+      await initializeRazorpayCheckout({
+        amount: selectedPaymentBooking.total_amount,
+        bookingRef: selectedPaymentBooking.booking_ref,
+        serviceName: selectedPaymentBooking.vendor?.name || 'Festivo Event Service',
+        customerName: selectedPaymentBooking.customer_name || userName || 'Festivo Customer',
+        customerEmail: selectedPaymentBooking.customer_email || userEmail || 'customer@festivo.in',
+        customerPhone: selectedPaymentBooking.customer_phone || '+91 9876543210',
+        onSuccess: async (razorpayPaymentId: string) => {
+          const { error } = await supabase
+            .from('bookings')
+            .update({ payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId })
+            .eq('id', selectedPaymentBooking.id);
 
-            if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
-              setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId } : b));
-              setPaymentSuccessMessage(`Razorpay Payment Verified (ID: ${razorpayPaymentId}) of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} successful!`);
-              setTimeout(() => {
-                setSelectedPaymentBooking(null);
-                setPaymentSuccessMessage(null);
-              }, 3000);
-            }
-            setIsProcessingPayment(false);
-          },
-          onFailure: (err: any) => {
-            const msg = typeof err === 'string' ? err : err?.description || err?.message || 'Payment processing failed';
-            console.error('Razorpay payment error:', err);
-            setPaymentErrorMessage(msg);
-            setIsProcessingPayment(false);
-          },
-          onDismiss: () => {
-            setIsProcessingPayment(false);
+          if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
+            setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed', payment_intent_id: razorpayPaymentId } : b));
+            setPaymentSuccessMessage(`Razorpay Payment Verified (ID: ${razorpayPaymentId}) of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} successful!`);
+            setTimeout(() => {
+              setSelectedPaymentBooking(null);
+              setPaymentSuccessMessage(null);
+            }, 3000);
           }
-        });
-      } catch (err: any) {
-        console.error('Razorpay launch exception:', err);
-        setPaymentErrorMessage(err.message || 'Unable to open Razorpay checkout');
-        setIsProcessingPayment(false);
-      }
-      return;
+          setIsProcessingPayment(false);
+        },
+        onFailure: (err: any) => {
+          const msg = typeof err === 'string' ? err : err?.description || err?.message || 'Payment processing failed';
+          console.error('Razorpay payment error:', err);
+          setPaymentErrorMessage(msg);
+          setIsProcessingPayment(false);
+        },
+        onDismiss: () => {
+          setIsProcessingPayment(false);
+        }
+      });
+    } catch (err: any) {
+      console.error('Razorpay launch exception:', err);
+      setPaymentErrorMessage(err.message || 'Unable to open Razorpay checkout');
+      setIsProcessingPayment(false);
     }
-
-    const { error } = await supabase
-      .from('bookings')
-      .update({ payment_status: 'paid', status: 'confirmed' })
-      .eq('id', selectedPaymentBooking.id);
-
-    if (!error || selectedPaymentBooking.id.startsWith('rec-')) {
-      setBookings(prev => prev.map(b => b.id === selectedPaymentBooking.id ? { ...b, payment_status: 'paid', status: 'confirmed' } : b));
-      setPaymentSuccessMessage(`Payment of ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} completed!`);
-      setTimeout(() => {
-        setSelectedPaymentBooking(null);
-        setPaymentSuccessMessage(null);
-      }, 2000);
-    }
-    setIsProcessingPayment(false);
   };
 
   return (
@@ -414,145 +391,48 @@ export default function PaymentsTab({ bookings: userBookings, setBookings, userE
                     </div>
                   )}
 
-                  {/* Select Payment Method */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-sage-900 uppercase tracking-wider mb-2">Select Payment Method</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {[
-                        { id: 'razorpay', label: 'Razorpay', icon: Sparkles },
-                        { id: 'upi', label: 'UPI / QR', icon: QrCode },
-                        { id: 'card', label: 'Cards', icon: CreditCard },
-                        { id: 'netbanking', label: 'Banking', icon: Building },
-                      ].map(m => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setPaymentMethod(m.id as any)}
-                          className={`py-2.5 px-2 rounded-xl border flex flex-col items-center gap-1 transition-all ${
-                            paymentMethod === m.id
-                              ? 'border-sage-600 bg-sage-50 text-sage-900 font-bold ring-2 ring-sage-400/20'
-                              : 'border-sage-200 hover:border-sage-300 text-dark-500'
-                          }`}
-                        >
-                          <m.icon className={`w-4 h-4 ${paymentMethod === m.id ? 'text-sage-700' : 'text-dark-400'}`} />
-                          <span className="text-[11px]">{m.label}</span>
-                        </button>
-                      ))}
+                  {/* Razorpay Gateway Card */}
+                  <div className="space-y-3 bg-blue-50/70 p-4 rounded-2xl border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-950 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+                        Razorpay Express Checkout
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">Official Gateway</span>
                     </div>
-                  </div>
 
-                  {/* Payment Method Details Input */}
-                  {paymentMethod === 'razorpay' && (
-                    <div className="space-y-2.5 bg-blue-50/60 p-3.5 rounded-2xl border border-blue-200">
+                    <div className="bg-white p-3.5 rounded-xl border border-blue-100 shadow-sm space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                          Razorpay Express Checkout
-                        </span>
-                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Fast & Secure</span>
-                      </div>
-                      <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm flex items-center justify-between gap-2">
                         <div>
-                          <p className="text-xs font-bold text-sage-900">Razorpay Gateway Enabled</p>
-                          <p className="text-[10px] text-dark-500 mt-0.5">Supports UPI, Cards, NetBanking & Wallets</p>
+                          <p className="text-xs font-bold text-dark-900">Razorpay Gateway Enabled</p>
+                          <p className="text-[10px] text-dark-500 mt-0.5">Supports UPI (GPay, PhonePe), Cards, NetBanking & Wallets</p>
                         </div>
                         <span className="px-2.5 py-1 bg-blue-600 text-white font-bold text-xs rounded-lg shadow-xs flex-shrink-0">
                           Razorpay
                         </span>
                       </div>
                     </div>
-                  )}
 
-                  {paymentMethod === 'upi' && (
-                    <div className="space-y-2.5 bg-sage-50/50 p-3.5 rounded-2xl border border-sage-100">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-sage-900">Instant UPI Payment</span>
-                        <span className="text-[10px] font-bold text-sage-600 bg-sage-100 px-2 py-0.5 rounded-full">GPay / PhonePe / Paytm</span>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Enter UPI ID (e.g. name@upi or phone@paytm)"
-                        value={upiId}
-                        onChange={(e) => setUpiId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-white border border-sage-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-sage-400 font-medium"
-                      />
-                    </div>
-                  )}
-
-                  {paymentMethod === 'card' && (
-                    <div className="space-y-2.5 bg-sage-50/50 p-3.5 rounded-2xl border border-sage-100">
-                      <div>
-                        <label className="block text-[11px] font-bold text-dark-600 mb-1">Card Number</label>
-                        <input
-                          type="text"
-                          placeholder="4532 •••• •••• 8901"
-                          maxLength={19}
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(e.target.value)}
-                          className="w-full px-3.5 py-2 bg-white border border-sage-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-sage-400 font-mono"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] font-bold text-dark-600 mb-1">Expiry Date</label>
-                          <input
-                            type="text"
-                            placeholder="MM/YY"
-                            maxLength={5}
-                            value={cardExpiry}
-                            onChange={(e) => setCardExpiry(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-sage-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-sage-400 text-center font-mono"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-dark-600 mb-1">CVV</label>
-                          <input
-                            type="password"
-                            placeholder="•••"
-                            maxLength={4}
-                            value={cardCvv}
-                            onChange={(e) => setCardCvv(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-sage-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-sage-400 text-center font-mono"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {paymentMethod === 'netbanking' && (
-                    <div className="space-y-2 bg-sage-50/50 p-3.5 rounded-2xl border border-sage-100">
-                      <label className="block text-[11px] font-bold text-dark-600">Select NetBanking Bank</label>
-                      <select className="w-full px-3.5 py-2.5 bg-white border border-sage-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-sage-400 font-bold text-sage-900">
-                        <option>HDFC Bank</option>
-                        <option>ICICI Bank</option>
-                        <option>State Bank of India (SBI)</option>
-                        <option>Axis Bank</option>
-                        <option>Kotak Mahindra Bank</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {paymentMethod === 'card' && (
-                    <div className="flex items-center gap-2 text-dark-500 text-[11px] bg-cream-50 p-2.5 rounded-xl border border-cream-200">
+                    <div className="flex items-center gap-2 text-dark-500 text-[11px] bg-white/80 p-2.5 rounded-xl border border-blue-100">
                       <Lock className="w-3.5 h-3.5 text-sage-600 flex-shrink-0" />
-                      <span>Transactions are 256-bit SSL Encrypted & Secured</span>
+                      <span>256-bit SSL Bank-Grade Encryption • Instant Verification</span>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Submit Buttons */}
-                  <div className="flex gap-2 pt-1">
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
                     <button
                       type="button"
                       onClick={handleProcessPayment}
                       disabled={isProcessingPayment}
-                      className="flex-1 py-3 bg-gradient-brand text-white font-bold rounded-xl shadow-md hover:shadow-glow transition-all flex items-center justify-center gap-2 text-xs disabled:opacity-50"
+                      className="flex-1 py-3.5 bg-gradient-brand text-white font-bold rounded-xl shadow-md hover:shadow-glow transition-all flex items-center justify-center gap-2 text-xs disabled:opacity-50"
                     >
-                      {isProcessingPayment ? 'Processing...' : `Pay ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} Now`}
+                      {isProcessingPayment ? 'Opening Razorpay...' : `Pay ₹${selectedPaymentBooking.total_amount.toLocaleString('en-IN')} via Razorpay`}
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedPaymentBooking(null)}
-                      className="px-4 py-3 border border-sage-200 text-sage-700 font-bold rounded-xl text-xs hover:bg-sage-50 transition-colors"
+                      className="px-4 py-3.5 border border-sage-200 text-sage-700 font-bold rounded-xl text-xs hover:bg-sage-50 transition-colors"
                     >
                       Cancel
                     </button>
