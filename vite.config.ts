@@ -150,6 +150,9 @@ export default defineConfig({
     },
   },
   build: {
+    // Required for Capacitor: assets must use relative paths so the
+    // Android WebView can resolve them from the bundled file system.
+    base: './',
     rollupOptions: {
       output: {
         manualChunks: {

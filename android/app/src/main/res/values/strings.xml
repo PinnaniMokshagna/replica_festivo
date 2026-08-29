@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Festivo</string>
+    <string name="title_activity_main">Festivo</string>
+    <string name="package_name">com.festivo.app</string>
+    <string name="custom_url_scheme">com.festivo.app</string>
+</resources>
