@@ -42,8 +42,8 @@ export default function Services() {
         </div>
 
         {/* Filter Navigation Bar */}
-        <div className="flex justify-center mb-8 sm:mb-14 overflow-x-auto pb-2 scrollbar-none">
-          <div className="inline-flex p-1.5 rounded-2xl bg-sage-100/70 border border-sage-200/80 backdrop-blur-md shadow-inner gap-1 flex-nowrap">
+        <div className="w-full overflow-x-auto pb-3 mb-8 sm:mb-14 scrollbar-none flex justify-start sm:justify-center px-1 sm:px-0">
+          <div className="inline-flex p-1 rounded-2xl sm:rounded-2xl bg-sage-100/70 border border-sage-200/80 backdrop-blur-md shadow-inner gap-1 flex-nowrap shrink-0 mx-auto sm:mx-0">
             {[
               { id: 'all', label: 'All Services (14)' },
               { id: 'popular', label: 'Most Popular' },
@@ -52,7 +52,7 @@ export default function Services() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-300 whitespace-nowrap ${
+                className={`px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-300 whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-sage-900 text-white shadow-md scale-[1.02]'
                     : 'text-sage-700 hover:text-sage-950 hover:bg-white/50'
