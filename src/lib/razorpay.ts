@@ -55,13 +55,23 @@ export function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined') {
+    const isLocalDevServer = window.location.hostname === 'localhost' && window.location.port === '5173';
+    if (isLocalDevServer) return '';
+  }
+  return 'https://festivo-replica-3nh6.onrender.com';
+};
+
 /**
  * STEP 1: Calls backend to create Razorpay Order
  */
 export async function createRazorpayOrder(amountInRupees: number, receipt: string, notes?: Record<string, string>) {
   const amountInPaise = Math.round(amountInRupees * 100);
+  const baseUrl = getApiBaseUrl();
 
-  const response = await fetch('/api/create-order', {
+  const response = await fetch(`${baseUrl}/api/create-order`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -90,7 +100,9 @@ export async function verifyRazorpayPayment(params: {
   razorpay_payment_id: string;
   razorpay_signature: string;
 }): Promise<RazorpayVerificationResponse> {
-  const response = await fetch('/api/verify-payment', {
+  const baseUrl = getApiBaseUrl();
+
+  const response = await fetch(`${baseUrl}/api/verify-payment`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

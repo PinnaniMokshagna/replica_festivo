@@ -36,6 +36,7 @@ import { SupportPage } from './pages/support-page';
 import { NotificationsPage } from './pages/notifications-page';
 
 import ScrollToTop from './components/ScrollToTop';
+import AppBackButtonHandler from './components/AppBackButtonHandler';
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
         <DataProvider>
           <BrowserRouter>
             <ScrollToTop />
+            <AppBackButtonHandler />
             <Routes>
               {/* Public Website Routes */}
               <Route path="/" element={<HomePage />} />
